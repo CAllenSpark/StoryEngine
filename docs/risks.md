@@ -14,3 +14,7 @@ Severity: L / M / H. Status: Open / Mitigating / Accepted / Closed.
 | R6 | Tech | Bundle size creeps past 5 MB JS budget | M | Frontend Eng | CI size gate from Sprint 2 | Open |
 | R7 | Cost | Backend/CDN $/MAU exceeds ceiling at scale | M | Backend Eng | Serverless + static CDN default; model cost before each new service is added | Open |
 | R8 | Team | Cross-discipline thrash (scope, vision, budget conflicts) | L | PM + Design Leader | Clear RACI in `team/TEAM.md`; end-of-sprint ritual enforces alignment | Open |
+| R9 | Tool | WYSIWYG studio complexity — embedding runtime in authoring tool doubles surface area | H | Frontend Eng | Sandboxed iframe approach limits blast radius; reuse production runtime, don't fork it | Open |
+| R10 | Scope | Media extensibility (video, rich media) creeps into early sprints before core is solid | M | PM | Define extensible schema now but defer implementation past M4; gate behind feature flag | Open |
+| R11 | Design | Card/location metaphor constrains spatial design — some stories may need scrolling or connected spaces | M | Design Leader | Prototype card transitions early (Sprint 3–4); allow cards to be multi-screen if needed | Open |
+| R12 | Tech | Code export pipeline adds build complexity and new failure modes | M | Frontend Eng | Start with "enhanced JSON bundle" (validated + tree-shaken); full code compilation is a later milestone | Open |

@@ -18,3 +18,12 @@
 - **Engine Runtime** — the browser/mobile code that plays an adventure.
 - **Perf Budget** — the measurable ceiling on memory, frame time, bundle size, and cost.
 - **opusplan** — Claude Code model alias: Opus in plan mode, Sonnet in execution mode.
+- **Card** — a discrete location or screen in the world; the atomic spatial unit. Inspired by HyperCard stacks. One card = one tilemap + its actors + triggers + dialogue.
+- **Location** — synonym for Card when referring to the in-world place it represents.
+- **Chapter** — a collection of beats and cards forming one episode. A micro-adventure is one chapter.
+- **Episode / Episodic World** — the ongoing, expanding world across chapters. Same characters and setting; new story beats each release.
+- **Inventory** — items the player collects that unlock new cards/locations (e.g. "getting the compass" reveals the Cove).
+- **Discovery Mechanic** — gameplay where collecting an item or gaining knowledge unlocks a new card.
+- **Code Export** — the build step that converts authored studio data into a publishable, optimized runtime bundle (not just raw JSON).
+- **WYSIWYG Preview** — live rendering inside the studios that shows exactly what the player will see, using the same rendering pipeline as the engine runtime.
+- **Media Trigger** — an event that fires rich media (audio, sprites, and in the future video) in response to player actions or beat transitions.

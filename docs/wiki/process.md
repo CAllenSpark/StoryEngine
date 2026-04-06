@@ -24,6 +24,9 @@ This keeps deep reasoning on Opus and fast iteration on Sonnet, balancing qualit
 - [ ] Dashboard refreshed by PM.
 - [ ] Wiki updated by Researcher where new knowledge landed.
 - [ ] Perf regression green (Sprint 2+).
+- [ ] Testing strategy items completed (unit, integration, visual regression as applicable).
+- [ ] Debug overlay verified functional for any new runtime feature.
+- [ ] Real device testing completed if runtime changes shipped.
 - [ ] Retro appended to the sprint doc.
 - [ ] Commit + push to the active feature branch.
 
@@ -35,6 +38,10 @@ This keeps deep reasoning on Opus and fast iteration on Sonnet, balancing qualit
 - [ ] Accessibility baseline met.
 - [ ] Tests updated.
 - [ ] Any new dep has a linked trade-off review.
+- [ ] Debug overlay updated if PR adds visible runtime state.
+- [ ] Schema changes validated (scene.json / adventure.json).
+- [ ] Bundle size delta reported by CI.
+- [ ] Visual regression snapshots updated if render output changed.
 
 ## End-of-Sprint Ritual (every agent runs it)
 1. Update owned docs.
