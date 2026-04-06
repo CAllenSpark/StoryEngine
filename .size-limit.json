@@ -1,0 +1,8 @@
+[
+  {
+    "name": "engine",
+    "path": "packages/engine/dist/index.js",
+    "limit": "500 KB",
+    "gzip": true
+  }
+]

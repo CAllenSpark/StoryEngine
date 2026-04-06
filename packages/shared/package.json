@@ -1,0 +1,15 @@
+{
+  "name": "@storyengine/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/ --ext .ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
