@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Sprite, Texture, type ColorSource } from 'pixi.js';
+import { Application, Container, Graphics, Rectangle, Sprite, Texture, type ColorSource } from 'pixi.js';
 import type { IRenderer } from './IRenderer.js';
 import { RendererStats } from './RendererStats.js';
 import type { Tilemap } from '../scene/Tilemap.js';
@@ -80,6 +80,27 @@ export class PixiRenderer implements IRenderer {
 
   destroy(): void {
     this.app.destroy(true);
+  }
+
+  async loadTilesetTexture(
+    imageSource: string | HTMLImageElement,
+    tileSize: number,
+    columns: number,
+  ): Promise<void> {
+    const src = typeof imageSource === 'string' ? imageSource : imageSource.src;
+    const baseTexture = await Texture.from(src).source;
+    await baseTexture.load();
+    const rows = Math.floor(baseTexture.height / tileSize);
+
+    this.tileTextures.clear();
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < columns; c++) {
+        const id = r * columns + c;
+        const frame = new Rectangle(c * tileSize, r * tileSize, tileSize, tileSize);
+        const tex = new Texture({ source: baseTexture, frame });
+        this.tileTextures.set(id, tex);
+      }
+    }
   }
 
   private generatePlaceholderTextures(): void {

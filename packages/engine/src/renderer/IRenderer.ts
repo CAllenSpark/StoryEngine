@@ -9,5 +9,6 @@ export interface IRenderer {
   drawActor(actor: Actor): void;
   end(): void;
   destroy(): void;
+  loadTilesetTexture?(imageSource: string | HTMLImageElement, tileSize: number, columns: number): Promise<void>;
   readonly stats: RendererStats;
 }

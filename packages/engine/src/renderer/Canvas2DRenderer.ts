@@ -67,6 +67,14 @@ export class Canvas2DRenderer implements IRenderer {
     this.stats.endFrame(frameTime);
   }
 
+  async loadTilesetTexture(
+    _imageSource: string | HTMLImageElement,
+    _tileSize: number,
+    _columns: number,
+  ): Promise<void> {
+    // Canvas2D tileset loading — stub for future implementation
+  }
+
   destroy(): void {
     // Canvas2D doesn't need explicit cleanup
   }
