@@ -62,6 +62,25 @@ From Sprint 2 onward:
 - Size gate on bundles (CI).
 - Violations block merge until resolved or formally waived by PM.
 
+## Cost Model (Draft) *(Backend Engineer)*
+
+Estimates at **100k MAU**. Assumes serverless + static CDN (Cloudflare stack).
+
+| Cost Line | Estimate | Notes |
+|---|---|---|
+| CDN egress | ~$20–50/mo | 2 MB/play × 10 plays/MAU/mo × 100k MAU = 2 TB/mo. Cloudflare free tier covers most. |
+| Asset storage (R2) | ~$5–15/mo | 100 episodes × 2 MB = 200 MB + shared assets. R2: $0.015/GB/mo. |
+| Save state storage | ~$1–5/mo | 100k users × 10 KB world state = 1 GB. R2 or KV. |
+| Telemetry ingestion | ~$5–20/mo | Batched writes to Analytics Engine or append-only R2 log. |
+| Serverless functions | ~$0–10/mo | Publish API + save sync. Low volume. Cloudflare Workers free tier covers most. |
+| Crash reporting (Sentry) | ~$0–26/mo | Free tier: 5k events/mo. Paid: $26/mo for 50k. |
+| Payment SDK (Stripe) | 2.9% + $0.30/txn | One-time member purchase only. Low volume. |
+| **Total estimated** | **~$30–130/mo** | **$0.0003–0.0013 per MAU** |
+
+**Circuit breaker:** if $/MAU exceeds $0.01 (10× estimate), alert PM to adjust feature set or re-evaluate provider.
+
+These are pre-revenue estimates. Actual costs depend on traffic patterns, cache hit rates, and telemetry volume. Refresh this model each sprint once real data exists.
+
 ## Audio Budget Detail *(Audio Director)*
 - Prefer short loopable stems + procedural variation.
 - Mobile fallback bitrates mandatory.

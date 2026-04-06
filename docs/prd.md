@@ -25,8 +25,23 @@ The "5-minute story seeker": adults who love narrative games but rarely have 30+
 ## Core Components
 - **Tile Creator Studio** — author environment assets and tilemaps with live WYSIWYG preview of the runtime rendering.
 - **Game Design Studio** — creative authoring environment for cards/locations, actors, dialogue, triggers, and multi-path narrative. WYSIWYG preview and code export for publishing. Authors think in cards and story beats, not coordinates and code.
-- **Game Engine Runtime** — render sprites, play audio, drive interactions, fire media triggers.
-- **Player Shell** — browse, download, and play micro-adventures.
+- **Game Engine Runtime** — render sprites, play audio, drive interactions, fire media triggers. Reads world state snapshot on episode start; writes updated snapshot on completion.
+- **Player Shell** — browse, download, and play micro-adventures. Manages library, member status, and episode recaps.
+- **AI Companion *(Roadmap, M7+)*** — optional BYOK (bring-your-own-key) LLM-powered partner character. Scripted by default; comes to life with a player-provided API key. See [`wiki/ai-companion.md`](wiki/ai-companion.md).
+
+## Episodic Publishing Cadence
+- **Target:** one new episode per week during active development.
+- **Workflow:** author in studio → WYSIWYG preview → content approval → code export → publish to CDN → library manifest update.
+- **World state:** episodes act in isolation. Each reads a snapshot of the world at the end of the previous episode. No live cross-episode state — just a simple ordered chain. See [`wiki/world-state.md`](wiki/world-state.md).
+- **Publishing details:** See [`wiki/publishing-workflow.md`](wiki/publishing-workflow.md).
+
+## Monetization Model
+**Minecraft-style early access:**
+- First X episodes are **free** — the proving ground. Players experience the world and decide if they want more.
+- **One-time "member" purchase** unlocks everything: all current episodes + all future updates as they ship.
+- Value grows over time as the catalog expands — early members get the best deal.
+- **No micro-payments.** No per-episode pricing. No subscription tiers. No DLC packs. No ads.
+- Technical implementation is simple: a single free/member binary check. See [`wiki/publishing-workflow.md`](wiki/publishing-workflow.md) for library manifest `isFree` flag.
 
 ## Media Extensibility
 - **Current:** pixel sprites, tile maps, audio stems, SFX.
@@ -41,3 +56,4 @@ See [`kpis.md`](kpis.md). North star: completed micro-adventures per user per we
 - Combat systems.
 - Multiplayer.
 - Public UGC marketplace (internal authoring only until post-M4).
+- Per-episode pricing, subscription tiers, or ad-supported model.

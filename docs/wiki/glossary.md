@@ -27,3 +27,10 @@
 - **Code Export** — the build step that converts authored studio data into a publishable, optimized runtime bundle (not just raw JSON).
 - **WYSIWYG Preview** — live rendering inside the studios that shows exactly what the player will see, using the same rendering pipeline as the engine runtime.
 - **Media Trigger** — an event that fires rich media (audio, sprites, and in the future video) in response to player actions or beat transitions.
+- **World State Snapshot** — a JSON file capturing the state of the world at the end of an episode (inventory, flags, locations). Each episode reads the previous snapshot and writes an updated one. Simple ordered chain, not a live database.
+- **Starter State** — a curated world state snapshot for players joining mid-series. Hand-authored by Design Leader. Grants essential items, flags, and locations so the episode is playable without prior episodes.
+- **Condition Language** — the simple expression format used in `adventure.json` for branching: boolean flags, numeric comparisons, inventory checks, episode progress checks. No nested logic.
+- **Member** — a player who has made the one-time purchase to unlock all content. Minecraft-model: pay once, get everything current + future.
+- **BYOK (Bring Your Own Key)** — the player provides their own LLM API key to power the AI companion character. Key stored locally; never sent to our servers.
+- **AI Companion** — a partner character present in every episode. Scripted by default; optionally LLM-powered via BYOK. Always stays in character. Adds texture to interactions without changing adventure structure.
+- **Publish API** — the backend endpoint for deploying adventure bundles to CDN and updating the library manifest. Requires human approval.

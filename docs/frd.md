@@ -38,6 +38,25 @@ Each feature lists a one-line acceptance criterion. Full specs land in later spr
 - **F-SHL-3 Session timer** — diegetic hint that respects the 5-minute shape.
 - **F-SHL-4 Accessibility** — keyboard nav, screen-reader labels, colorblind-safe palettes, scalable text.
 - **F-SHL-5 Touch targets ≥ 44px** on mobile.
+- **F-SHL-6 Library series structure** — episodes grouped by series with episode numbers, "New" badge on latest releases, completion status per episode.
+- **F-SHL-7 Continue vs. New routing** — smart default: "Continue" resumes the last unfinished episode; "New" starts the next in sequence. Player can also browse freely.
+- **F-SHL-8 Episode recap** — if a player hasn't played the previous episode, offer a brief text summary ("Previously on...") before starting. Authored per-episode by Design Leader.
+- **F-SHL-9 Member status** — display free/member status. Single purchase flow for membership (one-time, unlocks everything). Free episodes marked clearly in library.
+
+## Publishing *(PM + Backend Engineer)*
+- **F-PUB-1 Content approval checklist** — in-studio checklist (session timer, dialogue limits, beat timing, asset completeness) + Design Leader sign-off gate before code export.
+- **F-PUB-2 Publish to CDN** — POST /publish API: validate bundle, upload to CDN, update library manifest.
+- **F-PUB-3 Rollback / unpublish** — PM can unpublish an episode or revert to a previous version via the publish API.
+- **F-PUB-4 Library manifest update** — GET /library returns the current manifest; Player Shell fetches it once per session (cached via service worker).
+
+## Game Engine Runtime (continued)
+- **F-ENG-8 World state load/save** — on episode start, read `worldState.json` snapshot (chain model). On episode completion, write updated snapshot. See [`wiki/world-state.md`](wiki/world-state.md).
+- **F-ENG-9 Starter state** — for mid-series players: load a curated `starterState.json` if no world state exists for the required episode.
+
+## AI Companion *(Roadmap, M7+)*
+- **F-AIC-1 BYOK API key input** — player enters their LLM API key in settings. Stored locally only; never sent to our servers.
+- **F-AIC-2 LLM companion dialogue mode** — dialogue nodes tagged `ai_companion: true` use the player's API key to generate in-character responses when key is present.
+- **F-AIC-3 Fallback to scripted dialogue** — if no API key or LLM call fails, silently render the authored scripted line. No degradation in core experience.
 
 ## Cross-Cutting
 - All features ship with measurable perf impact (memory delta, frame time delta, bundle delta).

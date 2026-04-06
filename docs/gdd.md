@@ -42,6 +42,29 @@ Lightweight inventory: items are **narrative keys**, not stats.
 - Example: pick up the compass → the map card appears with the Cove highlighted → follow the compass to the Cove (a new card/location opens).
 - Items can also gate dialogue options ("show the compass to the hermit → he tells you about the lighthouse").
 - Keep the system minimal: items unlock things and enable conversations, nothing more.
+- **World state persistence:** inventory persists across episodes via the **world state snapshot chain** — each episode reads the world as it was at the end of the previous one. Not a live database; just a simple JSON snapshot passed forward. See [`wiki/world-state.md`](wiki/world-state.md).
+
+## Condition Language
+Adventures use a simple condition system for branching dialogue, card access, beat triggers, and actor visibility.
+
+**Supported:**
+- Boolean flag check: `{ flag: "trusts_hermit", op: "==", value: true }`
+- Numeric comparison: `{ flag: "hermit_trust_level", op: ">=", value: 0.5 }`
+- Inventory check: `{ inventory: "compass" }` (shorthand: item exists)
+- Episode progress: `{ episodeCompleted: { op: ">=", value: 3 } }`
+- Location discovered: `{ location: "cove" }`
+
+**Not supported (by design):** nested logic (`AND`/`OR` combinators). Complex conditions should be broken into multiple beats — this respects the 5-minute constraint and keeps authoring accessible to non-technical designers.
+
+See [`wiki/world-state.md`](wiki/world-state.md) for full condition language spec.
+
+## Starter State
+Players joining mid-series get a **curated starter snapshot** — a hand-authored `starterState.json` with essential items, key flags, and discovered locations.
+
+- Authored per-episode by Design Leader. Not auto-generated.
+- Paired with a brief text recap ("Previously on...") so the player has narrative context.
+- Players can always go back and play earlier episodes; the world state updates to reflect the completed chain.
+- See [`wiki/world-state.md`](wiki/world-state.md) for schema and examples.
 
 ## Micro-Adventure Shape
 - **Minute 0–1:** Hook — establish character, place, stakes.
@@ -81,6 +104,18 @@ Warm, curious, gently funny — the space between Day of the Tentacle's charm an
 - **Future media:** video sequences, animated backgrounds, rich media triggers.
 - Data schemas include a `mediaType` field from day one. Media triggers use a `type + payload` pattern so new media types slot in without schema-breaking changes.
 - Implementation of future types is deferred past M4; the schemas accommodate them now.
+
+## AI Companion Character *(Roadmap, M7+)*
+
+Every episode features a **partner character** — a companion with their own personality and point of view.
+
+- **Without API key:** Companion follows scripted dialogue trees authored in Game Design Studio. Part of the normal adventure.
+- **With API key (BYOK):** Player provides their own LLM API key. The companion comes to life — improvising, personalizing, referencing the player's history — but **always stays in character** and guides the player like a personified help system.
+- **Example (X-Files):** Player is Mulder. Scully is the companion. Without key: "Mulder, I found something in the lab." With key: "You showed the compass to the hermit? That was reckless — but it might explain the signal we picked up near the lighthouse."
+- **Core narrative unchanged.** The companion adds texture to interactions, not new branching paths or card unlocks.
+- **Guardrails:** system prompt enforces character voice, no spoilers, no 4th-wall breaks, ≤3 lines per response.
+
+See [`wiki/ai-companion.md`](wiki/ai-companion.md) for architecture, guardrails, and timeline.
 
 ## Reference Library
 See [`sprints/sprint-01.md`](sprints/sprint-01.md) research section.

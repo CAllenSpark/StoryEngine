@@ -90,16 +90,48 @@ Studios embed a sandboxed instance of the Engine Runtime for live preview:
 - **Hot-reload:** on every authoring change, the studio sends a delta update. The preview applies it without full reload — authors see changes in real time.
 - **Same pipeline:** preview uses the identical rendering path as the player-facing runtime. If it looks right in preview, it looks right in production.
 
+### World State Architecture
+
+Episodes use a **snapshot chain model** for world persistence. See [`wiki/world-state.md`](wiki/world-state.md) for full spec.
+
+- **On episode start:** engine reads `worldState.json` from IndexedDB. If none exists (new player), use the episode's `starterState.json`.
+- **During episode:** engine tracks state changes (inventory additions, flag changes, location discoveries) in memory.
+- **On episode completion:** engine writes the updated `worldState.json` back to IndexedDB.
+- **Schema:** `{ schemaVersion, episodeCompleted, inventory[], discoveredLocations[], characterFlags{}, worldFlags{} }`
+- **Condition language:** simple boolean flags + comparison operators. No nested logic. Used for dialogue branches, card access gates, beat triggers, and actor visibility.
+- **Migrations:** schema-versioned; forward migrations applied by the episode loader when loading older snapshots.
+
+### Shared Asset Architecture
+
+Recurring characters, locations, and UI elements live in a **shared-assets bundle** separate from per-episode bundles:
+
+- `shared-assets-v{version}-{hash}.zip` contains: protagonist sprites, recurring NPC sprites, common UI elements, shared audio stings.
+- Episodes reference shared assets by ID (e.g., `character: "jack"`) — not by embedding sprite data.
+- Shared assets have their own version + cache lifecycle on the CDN.
+- When a shared asset is updated (e.g., protagonist sprite fix), a new shared-assets version is published. Old episodes continue referencing the old version; new episodes reference the new one.
+- **Estimate:** 20 episodes sharing 5 characters saves ~25 MB of duplication vs. embedding sprites per-episode.
+
 ### Code Export Pipeline
 
 Studios author in structured JSON; the export step produces an optimized, self-contained adventure bundle:
 
-1. **Validate:** run schema checks on `scene.json` and `adventure.json`. Fail with clear errors if invalid.
+1. **Validate:** run schema checks on `scene.json` and `adventure.json`. Validate conditions against world state schema. Fail with clear errors if invalid.
 2. **Tree-shake:** remove unused assets, unreachable beats, orphaned dialogue branches.
 3. **Compile:** convert dialogue graphs to optimized lookup tables; resolve inventory-gated card transitions to fast state checks.
-4. **Pack:** run atlas packing on sprites/tiles; generate multi-bitrate audio; compress with WebP + PNG fallback.
-5. **Emit:** produce a self-contained bundle with a manifest + content-hashed asset filenames.
+4. **Pack:** run atlas packing on sprites/tiles; generate multi-bitrate audio; compress with WebP + PNG fallback. Reference shared assets by ID (not embedded).
+5. **Emit:** produce a self-contained bundle with a manifest + content-hashed asset filenames + `minEngineVersion` + `starterState.json`.
 6. **Budget check:** pre-export validation against the perf budget (bundle size, sprite count, audio decode cost). Export fails if budget exceeded, with a report of what's over.
+
+### AI Companion Module *(Roadmap, M7+)*
+
+Optional BYOK (bring-your-own-key) LLM-powered companion character. See [`wiki/ai-companion.md`](wiki/ai-companion.md) for full spec.
+
+- **API key storage:** local only (IndexedDB/localStorage). Never sent to our servers.
+- **Dialogue interception:** nodes tagged `ai_companion: true` are intercepted. If API key present, construct prompt from character sheet + world state + conversation history → LLM call → filter → render. If no key, render scripted dialogue.
+- **Prompt construction:** character sheet, current world state snapshot, recent conversation history, current beat context, guardrail system prompt.
+- **Fallback:** LLM failure (timeout, rate limit, bad key) → silently render scripted line.
+- **Rate limiting:** cap LLM calls per session (e.g., max 20) to prevent runaway costs on player's key.
+- **Bundle impact:** companion module adds < 10 KB to engine bundle (thin API client + prompt template).
 
 ## Backend *(Backend Engineer)*
 
@@ -120,12 +152,33 @@ Studios author in structured JSON; the export step produces an optimized, self-c
 - **CDN:** adventure bundles served with content-hash URLs for perfect caching. Service worker pre-caches the current adventure on first load.
 - **Edge/CDN evaluation:** test Cloudflare vs. Vercel for cold starts, caching behavior, and real $/MAU at projected scale. Include R2 object storage cost modeling for assets (Sprint 2).
 
+### Publishing Infrastructure
+
+See [`wiki/publishing-workflow.md`](wiki/publishing-workflow.md) for full spec.
+
+- **Publish API:** POST /publish (validate → upload to CDN → update library manifest). GET /library (return manifest for Player Shell).
+- **Library manifest:** JSON listing all published episodes with metadata (id, version, title, cover, bundle URL, `isFree`, `minEngineVersion`). Cached via service worker.
+- **Versioning:** adventures are immutable. Patches = new version. CDN serves all versions; manifest points at latest.
+- **Rollback:** PM can unpublish or revert to previous version.
+- **Engine compatibility:** each adventure declares `minEngineVersion`; runtime checks on load.
+
+### Monetization Architecture
+
+**Minecraft-model:** first X episodes free, one-time "member" purchase unlocks everything.
+
+- **Member check:** local flag (`isMember: true`) stored in IndexedDB. For members with cloud sync, verified server-side.
+- **Payment SDK:** Stripe (web) or RevenueCat (mobile wrapper). Single product: "StoryEngine Membership."
+- **Player Shell behavior:** library manifest marks each episode `isFree: true/false`. Shell checks `isMember` before loading a paid episode. If not member → show purchase flow.
+- **Offline:** once purchased, membership flag is local. Player can access all content offline indefinitely.
+- **No per-episode pricing.** No subscription management. No DLC. Single binary check.
+
 ### Save/Sync Architecture
 
-- **Offline-first:** all save state persisted in IndexedDB via localForage. Game works fully offline.
+- **Offline-first:** all save state + world state persisted in IndexedDB via localForage. Game works fully offline.
+- **World state sync:** members can optionally sync `worldState.json` to cloud for cross-device play. Free players are local-only.
 - **Sync (when online):** last-write-wins for V1; conflict resolution strategy deferred to V2.
 - **Save schema:** versioned. Migrations co-owned by frontend engineer + tester.
-- **Data stored:** current card, beat progress, inventory, dialogue flags, session timer.
+- **Data stored:** current card, beat progress, per-episode inventory, dialogue flags, session timer. Plus `worldState.json` (cross-episode chain).
 
 ### Security Baseline
 

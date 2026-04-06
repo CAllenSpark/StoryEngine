@@ -8,6 +8,10 @@ Versioned, markdown-native knowledge base. Updated at the end of every sprint.
 - [Performance Budget](performance-budget.md) — memory, FPS, payload, cost targets.
 - [Debugging](debugging.md) — developer tools, debug overlays, console API, hot-reload.
 - [Testing Strategy](testing-strategy.md) — testing pyramid, CI gates, playtesting protocols.
+- [World State](world-state.md) — episodic snapshot model, condition language, starter state.
+- [Publishing Workflow](publishing-workflow.md) — publish API, content approval, versioning, rollback.
+- [Telemetry](telemetry.md) — event schema, editorial dashboards, crash reporting.
+- [AI Companion](ai-companion.md) — BYOK LLM companion character system (roadmap, M7+).
 - [Process](process.md) — sprint cadence, `opusplan` workflow, DoD.
 - [Glossary](glossary.md) — shared vocabulary.
 
