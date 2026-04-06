@@ -1,10 +1,4 @@
-import { useRef } from 'react';
-import { usePreviewBridge } from '../hooks/usePreviewBridge.js';
-
 export function PreviewPane() {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  usePreviewBridge(iframeRef);
-
   return (
     <div
       style={{
@@ -17,18 +11,25 @@ export function PreviewPane() {
       }}
     >
       <div style={{ fontSize: 12, fontWeight: 600 }}>Preview</div>
-      <iframe
-        ref={iframeRef}
-        src="/src/preview/index.html"
-        sandbox="allow-scripts allow-same-origin"
+      <div
         style={{
           flex: 1,
           border: '1px solid #313244',
           borderRadius: 4,
           background: '#11111b',
-          imageRendering: 'pixelated',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#6c7086',
+          fontSize: 12,
+          textAlign: 'center',
+          padding: 16,
         }}
-      />
+      >
+        PixiJS preview coming soon.
+        <br />
+        Use the canvas editor for WYSIWYG tile editing.
+      </div>
     </div>
   );
 }

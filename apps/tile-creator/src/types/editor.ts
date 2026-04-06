@@ -2,6 +2,11 @@ import type { SceneJSON, TilesetRef } from '@storyengine/shared';
 
 export type Tool = 'paint' | 'erase';
 
+export interface ImportWarning {
+  level: 'info' | 'warn';
+  message: string;
+}
+
 export interface TilesetState {
   ref: TilesetRef;
   imageDataUrl: string;
@@ -32,6 +37,7 @@ export interface EditorActions {
   setZoom: (zoom: number) => void;
   setTileset: (tileset: TilesetState) => void;
   loadScene: (scene: SceneJSON) => void;
+  restoreTileset: () => Promise<void>;
 }
 
 export type EditorStore = EditorState & EditorActions;

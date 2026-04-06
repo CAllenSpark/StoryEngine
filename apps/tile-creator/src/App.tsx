@@ -1,4 +1,5 @@
 import { useEffect, useCallback } from 'react';
+import { useEditorStore } from './store/editorStore.js';
 import { useTemporalStore } from './store/temporal.js';
 import { Toolbar } from './components/Toolbar.js';
 import { TilesetPanel } from './components/TilesetPanel.js';
@@ -28,6 +29,10 @@ export function App() {
     },
     [undo, redo],
   );
+
+  useEffect(() => {
+    useEditorStore.getState().restoreTileset();
+  }, []);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);

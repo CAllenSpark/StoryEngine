@@ -4,6 +4,7 @@ import { TILE_SIZE, TILEMAP_COLS, TILEMAP_ROWS } from '@storyengine/shared';
 import type { SceneJSON, TileLayer } from '@storyengine/shared';
 import type { EditorStore, TilesetState, Tool } from '../types/editor.js';
 import { HISTORY_LIMIT } from './historyMiddleware.js';
+import { logger } from '../logger.js';
 
 function createEmptyLayer(name: string): TileLayer {
   return {
@@ -166,6 +167,48 @@ export const useEditorStore = create<EditorStore>()(
           activeLayerIndex: 0,
           layerVisibility: scene.layers.map(() => true),
         });
+      },
+
+      async restoreTileset() {
+        try {
+          const { loadTileset } = await import('../lib/assetDb.js');
+          const stored = await loadTileset();
+          if (!stored) return;
+
+          const img = new Image();
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error('Failed to load stored tileset'));
+            img.src = stored.dataUrl;
+          });
+
+          const columns = stored.columns;
+          const rows = Math.floor(img.height / stored.tileSize);
+          const tileImages: ImageBitmap[] = [];
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < columns; c++) {
+              const bmp = await createImageBitmap(
+                img,
+                c * stored.tileSize,
+                r * stored.tileSize,
+                stored.tileSize,
+                stored.tileSize,
+              );
+              tileImages.push(bmp);
+            }
+          }
+
+          const name = stored.filename.replace(/\.[^.]+$/, '');
+          get().setTileset({
+            ref: { name, tileSize: stored.tileSize, image: stored.filename, columns },
+            imageDataUrl: stored.dataUrl,
+            tileImages,
+          });
+
+          logger.info('Tileset restored from IndexedDB', { name, tileCount: tileImages.length });
+        } catch (err) {
+          logger.warn('Failed to restore tileset from IndexedDB', { error: String(err) });
+        }
       },
     }),
     {

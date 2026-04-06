@@ -1,3 +1,4 @@
+// NOTE: Currently unused. PreviewPane disabled until Vite multi-page entry configured.
 import { useEffect, useRef, type RefObject } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
 

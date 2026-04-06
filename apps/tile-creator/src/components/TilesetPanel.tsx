@@ -9,7 +9,7 @@ export function TilesetPanel() {
   const tileset = useEditorStore((s) => s.tileset);
   const selectedTileId = useEditorStore((s) => s.selectedTileId);
   const setSelectedTile = useEditorStore((s) => s.setSelectedTile);
-  const { importTileset, isLoading, error } = useTilesetImport();
+  const { importTileset, isLoading, error, warnings } = useTilesetImport();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const columns = tileset?.ref.columns ?? 0;
@@ -94,6 +94,21 @@ export function TilesetPanel() {
       </button>
       {error && (
         <span style={{ color: '#f38ba8', fontSize: 11 }}>{error}</span>
+      )}
+      {warnings.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {warnings.map((w, i) => (
+            <span
+              key={i}
+              style={{
+                fontSize: 11,
+                color: w.level === 'warn' ? '#f9e2af' : '#a6adc8',
+              }}
+            >
+              {w.level === 'warn' ? 'Warning: ' : 'Info: '}{w.message}
+            </span>
+          ))}
+        </div>
       )}
       {tileset ? (
         <canvas
