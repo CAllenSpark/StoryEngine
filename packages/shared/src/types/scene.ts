@@ -1,8 +1,14 @@
+export interface TileAnimation {
+  frames: number[];
+  speed: number;
+}
+
 export interface TilesetRef {
   name: string;
   tileSize: number;
   image: string;
   columns: number;
+  animations?: Record<string, TileAnimation>;
 }
 
 export interface TileLayer {

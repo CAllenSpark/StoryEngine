@@ -58,6 +58,7 @@ export interface EditorState {
   prefabLibrary: Prefab[];
   currentColor: string;
   colorTileMap: Record<string, number>;
+  animClock: number;
 }
 
 export interface EditorActions {
@@ -103,6 +104,9 @@ export interface EditorActions {
   setColor: (color: string) => void;
   paintColor: (x: number, y: number) => Promise<void>;
   autoTileImage: (image: HTMLImageElement, tileSize: number) => Promise<void>;
+  setTileAnimation: (baseTileId: number, frames: number[], speed: number) => void;
+  removeTileAnimation: (baseTileId: number) => void;
+  tickAnimation: () => void;
 }
 
 export type EditorStore = EditorState & EditorActions;

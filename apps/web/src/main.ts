@@ -53,6 +53,7 @@ async function main(): Promise<void> {
   // Game loop
   const loop = new GameLoop({
     update(dt: number) {
+      tilemap.updateAnimations(dt);
       actorSystem.update(dt, tilemap);
     },
     render(_interpolation: number) {

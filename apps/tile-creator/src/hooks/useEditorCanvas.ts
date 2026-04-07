@@ -1,6 +1,22 @@
 import { useEffect, useRef, useCallback, type RefObject } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
 import { decodeTransform } from '../lib/transformUtils.js';
+import type { TileAnimation } from '@storyengine/shared';
+
+function resolveAnimatedTile(
+  tileId: number,
+  animations: Record<string, TileAnimation> | undefined,
+  clock: number,
+): number {
+  if (!animations) return tileId;
+  const anim = animations[String(tileId)];
+  if (!anim || anim.frames.length < 2) return tileId;
+  const frameDuration = 1000 / anim.speed;
+  const totalDuration = frameDuration * anim.frames.length;
+  const t = clock % totalDuration;
+  const frameIdx = Math.floor(t / frameDuration);
+  return anim.frames[frameIdx] ?? tileId;
+}
 
 const GRID_COLOR = '#45475a';
 const HOVER_COLOR = 'rgba(137, 180, 250, 0.3)';
@@ -25,7 +41,8 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
       if (!ctx) return;
 
       const state = useEditorStore.getState();
-      const { scene, layerVisibility, zoom, tileset, selectionBounds, clipboard, activeTool } = state;
+      const { scene, layerVisibility, zoom, tileset, selectionBounds, clipboard, activeTool, animClock } = state;
+      const animations = tileset?.ref.animations;
       const ts = scene.tileSize;
       const w = scene.width * ts * zoom;
       const h = scene.height * ts * zoom;
@@ -45,8 +62,9 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
         for (let y = 0; y < scene.height; y++) {
           for (let x = 0; x < scene.width; x++) {
             const dataIdx = y * scene.width + x;
-            const tileId = layer.data[dataIdx];
-            if (tileId < 0) continue;
+            const rawTileId = layer.data[dataIdx];
+            if (rawTileId < 0) continue;
+            const tileId = resolveAnimatedTile(rawTileId, animations, animClock);
             const px = x * ts * zoom;
             const py = y * ts * zoom;
             const sz = ts * zoom;
@@ -151,6 +169,16 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
       cancelAnimationFrame(rafRef.current);
     };
   }, [scheduleRender]);
+
+  // Animation preview tick — only active when scene has animated tiles
+  useEffect(() => {
+    const anims = useEditorStore.getState().tileset?.ref.animations;
+    if (!anims || Object.keys(anims).length === 0) return;
+    const interval = setInterval(() => {
+      useEditorStore.getState().tickAnimation();
+    }, 250);
+    return () => clearInterval(interval);
+  });
 
   const toGrid = useCallback(
     (e: MouseEvent): { x: number; y: number } | null => {

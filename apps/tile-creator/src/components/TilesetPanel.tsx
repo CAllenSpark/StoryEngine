@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
 import { useTilesetImport } from '../hooks/useTilesetImport.js';
 import { ImportDialog } from './ImportDialog.js';
+import { AnimationDialog } from './AnimationDialog.js';
 
 const PALETTE_SCALE = 2;
 
@@ -16,6 +17,7 @@ export function TilesetPanel() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const [hoveredTileId, setHoveredTileId] = useState<number>(-1);
+  const [animDialogTileId, setAnimDialogTileId] = useState<number | null>(null);
 
   const tileSize = tileset?.ref.tileSize ?? 16;
   const columns = tileset?.ref.columns ?? 0;
@@ -94,6 +96,48 @@ export function TilesetPanel() {
     [tileset, tileSize, columns, tileCount],
   );
 
+  const handlePaletteContextMenu = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      e.preventDefault();
+      if (!tileset || columns === 0) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const scaleX = e.currentTarget.width / rect.width;
+      const scaleY = e.currentTarget.height / rect.height;
+      const x = Math.floor(((e.clientX - rect.left) * scaleX) / (tileSize * PALETTE_SCALE));
+      const y = Math.floor(((e.clientY - rect.top) * scaleY) / (tileSize * PALETTE_SCALE));
+      const id = y * columns + x;
+      if (id >= 0 && id < tileCount) {
+        setAnimDialogTileId(id);
+      }
+    },
+    [tileset, tileSize, columns, tileCount],
+  );
+
+  // Draw animated tile badges on the palette
+  const animations = tileset?.ref.animations;
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !tileset || !animations) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    for (const key of Object.keys(animations)) {
+      const id = Number(key);
+      if (id < 0 || id >= tileCount) continue;
+      const col = id % columns;
+      const row = Math.floor(id / columns);
+      const px = col * tileSize * PALETTE_SCALE;
+      const py = row * tileSize * PALETTE_SCALE;
+      // Small play triangle badge
+      ctx.fillStyle = 'rgba(137, 180, 250, 0.8)';
+      ctx.beginPath();
+      ctx.moveTo(px + 2, py + 2);
+      ctx.lineTo(px + 10, py + 7);
+      ctx.lineTo(px + 2, py + 12);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }, [tileset, tileSize, tileCount, columns, animations, selectedTileId]);
+
   useEffect(() => {
     const canvas = previewCanvasRef.current;
     if (!canvas || !tileset || hoveredTileId < 0 || hoveredTileId >= tileCount) {
@@ -139,6 +183,7 @@ export function TilesetPanel() {
             onClick={handlePaletteClick}
             onMouseMove={handlePaletteHover}
             onMouseLeave={() => setHoveredTileId(-1)}
+            onContextMenu={handlePaletteContextMenu}
             style={{ imageRendering: 'pixelated', cursor: 'pointer' }}
           />
           {hoveredTileId >= 0 && hoveredTileId < tileCount && (
@@ -182,6 +227,12 @@ export function TilesetPanel() {
             }
           }}
           onCancel={closeDialog}
+        />
+      )}
+      {animDialogTileId !== null && (
+        <AnimationDialog
+          baseTileId={animDialogTileId}
+          onClose={() => setAnimDialogTileId(null)}
         />
       )}
     </div>

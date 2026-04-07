@@ -83,6 +83,7 @@ export const useEditorStore = create<EditorStore>()(
       prefabLibrary: [],
       currentColor: '#a6e3a1',
       colorTileMap: {},
+      animClock: 0,
 
       paintTile(x: number, y: number) {
         const { scene, activeLayerIndex, selectedTileId, tileset, currentRotation, currentFlipH, currentFlipV } = get();
@@ -478,6 +479,33 @@ export const useEditorStore = create<EditorStore>()(
 
       setColor(color: string) {
         set({ currentColor: color });
+      },
+
+      setTileAnimation(baseTileId: number, frames: number[], speed: number) {
+        const { tileset, scene } = get();
+        if (!tileset) return;
+        const animations = { ...tileset.ref.animations, [String(baseTileId)]: { frames, speed } };
+        const ref = { ...tileset.ref, animations };
+        set({
+          tileset: { ...tileset, ref },
+          scene: { ...scene, tileset: ref },
+        });
+      },
+
+      removeTileAnimation(baseTileId: number) {
+        const { tileset, scene } = get();
+        if (!tileset?.ref.animations) return;
+        const animations = { ...tileset.ref.animations };
+        delete animations[String(baseTileId)];
+        const ref = { ...tileset.ref, animations: Object.keys(animations).length > 0 ? animations : undefined };
+        set({
+          tileset: { ...tileset, ref },
+          scene: { ...scene, tileset: ref },
+        });
+      },
+
+      tickAnimation() {
+        set((s) => ({ animClock: s.animClock + 250 }));
       },
 
       async paintColor(x: number, y: number) {

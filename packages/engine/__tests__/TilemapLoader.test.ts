@@ -54,4 +54,74 @@ describe('loadTilemap', () => {
     };
     expect(() => loadTilemap(bad)).toThrow('expected 6');
   });
+
+  it('loads animations from tileset ref', () => {
+    const scene: SceneJSON = {
+      ...validScene,
+      tileset: {
+        ...validScene.tileset,
+        animations: { '0': { frames: [0, 1, 2, 1], speed: 4 } },
+      },
+    };
+    const tilemap = loadTilemap(scene);
+    expect(tilemap.hasAnimations).toBe(true);
+  });
+
+  it('resolveAnimatedTile returns base tile when no animation', () => {
+    const tilemap = loadTilemap(validScene);
+    expect(tilemap.resolveAnimatedTile(0)).toBe(0);
+    expect(tilemap.resolveAnimatedTile(2)).toBe(2);
+  });
+
+  it('resolveAnimatedTile cycles through frames after updateAnimations', () => {
+    const scene: SceneJSON = {
+      ...validScene,
+      tileset: {
+        ...validScene.tileset,
+        animations: { '0': { frames: [0, 1, 2], speed: 4 } },
+      },
+    };
+    const tilemap = loadTilemap(scene);
+    // At t=0, should be frame 0
+    tilemap.updateAnimations(0);
+    expect(tilemap.resolveAnimatedTile(0)).toBe(0);
+
+    // At t=250ms (1 frame at 4fps = 250ms), should be frame 1
+    tilemap.updateAnimations(250);
+    expect(tilemap.resolveAnimatedTile(0)).toBe(1);
+
+    // At t=500ms, should be frame 2
+    tilemap.updateAnimations(250);
+    expect(tilemap.resolveAnimatedTile(0)).toBe(2);
+
+    // At t=750ms, should wrap back to frame 0
+    tilemap.updateAnimations(250);
+    expect(tilemap.resolveAnimatedTile(0)).toBe(0);
+  });
+
+  it('non-animated tiles are unaffected by updateAnimations', () => {
+    const scene: SceneJSON = {
+      ...validScene,
+      tileset: {
+        ...validScene.tileset,
+        animations: { '0': { frames: [0, 1], speed: 4 } },
+      },
+    };
+    const tilemap = loadTilemap(scene);
+    tilemap.updateAnimations(250);
+    expect(tilemap.resolveAnimatedTile(2)).toBe(2);
+  });
+
+  it('ignores single-frame animations', () => {
+    const scene: SceneJSON = {
+      ...validScene,
+      tileset: {
+        ...validScene.tileset,
+        animations: { '0': { frames: [0], speed: 4 } },
+      },
+    };
+    const tilemap = loadTilemap(scene);
+    expect(tilemap.hasAnimations).toBe(false);
+    expect(tilemap.resolveAnimatedTile(0)).toBe(0);
+  });
 });

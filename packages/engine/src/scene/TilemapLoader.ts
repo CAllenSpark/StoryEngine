@@ -15,5 +15,7 @@ export function loadTilemap(data: SceneJSON): Tilemap {
     }
   }
 
-  return new Tilemap(data.width, data.height, data.tileSize, data.layers);
+  const tilemap = new Tilemap(data.width, data.height, data.tileSize, data.layers);
+  tilemap.setAnimations(data.tileset.animations);
+  return tilemap;
 }

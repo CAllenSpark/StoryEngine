@@ -39,8 +39,9 @@ export class Canvas2DRenderer implements IRenderer {
       for (let y = 0; y < tilemap.height; y++) {
         for (let x = 0; x < tilemap.width; x++) {
           const idx = y * tilemap.width + x;
-          const tileId = layer.data[idx];
-          if (tileId === undefined || tileId < 0) continue;
+          const rawTileId = layer.data[idx];
+          if (rawTileId === undefined || rawTileId < 0) continue;
+          const tileId = tilemap.resolveAnimatedTile(rawTileId);
 
           this.ctx.fillStyle = TILE_COLORS[tileId % TILE_COLORS.length]!;
           this.ctx.fillRect(
