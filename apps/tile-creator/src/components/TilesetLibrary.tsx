@@ -101,27 +101,29 @@ export function TilesetLibrary() {
           />
         </form>
       ) : (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            mergeFromLibrary(ts.id);
-          }}
-          style={{ width: 18, height: 18, padding: 0, fontSize: 9, flexShrink: 0 }}
-          title="Merge into current tileset"
-        >
-          +
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setRenamingId(ts.id);
-            setRenameFolder(ts.folder || '');
-          }}
-          style={{ width: 18, height: 18, padding: 0, fontSize: 9, flexShrink: 0 }}
-          title="Assign folder"
-        >
-          f
-        </button>
+        <>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              mergeFromLibrary(ts.id);
+            }}
+            style={{ width: 18, height: 18, padding: 0, fontSize: 9, flexShrink: 0 }}
+            title="Merge into current tileset"
+          >
+            +
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setRenamingId(ts.id);
+              setRenameFolder(ts.folder || '');
+            }}
+            style={{ width: 18, height: 18, padding: 0, fontSize: 9, flexShrink: 0 }}
+            title="Assign folder"
+          >
+            f
+          </button>
+        </>
       )}
       <button
         onClick={(e) => {
@@ -163,7 +165,7 @@ export function TilesetLibrary() {
 
           if (folder === '') {
             // Ungrouped tilesets
-            return items.map(renderTileset);
+            return <div key="__ungrouped">{items.map(renderTileset)}</div>;
           }
 
           return (
