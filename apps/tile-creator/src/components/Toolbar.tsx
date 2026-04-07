@@ -49,7 +49,13 @@ export function Toolbar() {
         <button
           key={tool}
           className={activeTool === tool ? 'active' : ''}
-          onClick={() => setActiveTool(tool)}
+          onClick={() => {
+            if (tool === 'erase' && hasSelection) {
+              useEditorStore.getState().eraseSelection();
+            } else {
+              setActiveTool(tool);
+            }
+          }}
         >
           {TOOL_LABELS[tool]}
         </button>

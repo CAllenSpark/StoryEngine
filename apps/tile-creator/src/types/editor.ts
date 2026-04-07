@@ -72,6 +72,7 @@ export interface EditorState {
 export interface EditorActions {
   paintTile: (x: number, y: number) => void;
   eraseTile: (x: number, y: number) => void;
+  eraseSelection: () => void;
   addLayer: (name: string) => void;
   removeLayer: (index: number) => void;
   moveLayer: (from: number, to: number) => void;

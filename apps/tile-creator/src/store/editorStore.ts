@@ -127,6 +127,28 @@ export const useEditorStore = create<EditorStore>()(
         set({ scene: { ...scene, layers: newLayers } });
       },
 
+      eraseSelection() {
+        const { scene, activeLayerIndex, selectionBounds } = get();
+        if (!selectionBounds) return;
+        const { x1, y1, x2, y2 } = selectionBounds;
+        const layer = scene.layers[activeLayerIndex];
+        const newData = [...layer.data];
+        const newTransforms = layer.transforms
+          ? [...layer.transforms]
+          : new Array(scene.width * scene.height).fill(0);
+        for (let y = y1; y <= y2; y++) {
+          for (let x = x1; x <= x2; x++) {
+            const idx = y * scene.width + x;
+            newData[idx] = -1;
+            newTransforms[idx] = 0;
+          }
+        }
+        const newLayer = { ...layer, data: newData, transforms: newTransforms };
+        const newLayers = [...scene.layers];
+        newLayers[activeLayerIndex] = newLayer;
+        set({ scene: { ...scene, layers: newLayers }, selectionBounds: null });
+      },
+
       addLayer(name: string) {
         const { scene, layerVisibility } = get();
         const newLayer = createEmptyLayer(name);

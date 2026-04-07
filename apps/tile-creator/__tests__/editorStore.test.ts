@@ -342,6 +342,23 @@ describe('editorStore', () => {
       expect(useEditorStore.getState().clipboard).toBeNull();
     });
 
+    it('eraseSelection clears all tiles in selected area', () => {
+      const { setSelectedTile, paintTile } = useEditorStore.getState();
+      setSelectedTile(3);
+      paintTile(1, 1);
+      paintTile(2, 1);
+      paintTile(1, 2);
+      paintTile(2, 2);
+      useEditorStore.getState().selectArea(1, 1, 2, 2);
+      useEditorStore.getState().eraseSelection();
+      const { scene } = useEditorStore.getState();
+      expect(scene.layers[0].data[1 * scene.width + 1]).toBe(-1);
+      expect(scene.layers[0].data[1 * scene.width + 2]).toBe(-1);
+      expect(scene.layers[0].data[2 * scene.width + 1]).toBe(-1);
+      expect(scene.layers[0].data[2 * scene.width + 2]).toBe(-1);
+      expect(useEditorStore.getState().selectionBounds).toBeNull();
+    });
+
     it('stamp works across layers', () => {
       const { setSelectedTile, paintTile, setActiveLayer, addLayer } = useEditorStore.getState();
       setSelectedTile(5);

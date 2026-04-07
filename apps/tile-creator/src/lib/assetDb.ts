@@ -16,6 +16,7 @@ export interface StoredTileset {
   tileSize: number;
   columns: number;
   storedAt: number;
+  folder?: string;
 }
 
 let dbPromise: Promise<IDBDatabase> | null = null;

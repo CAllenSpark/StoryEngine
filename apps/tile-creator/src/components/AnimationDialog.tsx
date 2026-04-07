@@ -23,7 +23,6 @@ export function AnimationDialog({ baseTileId, onClose }: AnimationDialogProps) {
   );
   const [libName, setLibName] = useState('');
   const previewRef = useRef<HTMLCanvasElement>(null);
-  const [previewFrame, setPreviewFrame] = useState(0);
   const [activePhaseIdx, setActivePhaseIdx] = useState(0);
 
   const tileSize = tileset?.ref.tileSize ?? 16;
@@ -34,25 +33,51 @@ export function AnimationDialog({ baseTileId, onClose }: AnimationDialogProps) {
   }, []);
 
   // Flatten all frames for preview
-  const allFrames = phases.flatMap((p) => {
-    if (p.loops !== undefined) {
-      const repeated: number[] = [];
-      for (let i = 0; i < p.loops; i++) repeated.push(...p.frames);
-      return repeated;
-    }
-    return p.frames;
-  });
+  // Time-based preview clock
+  const [previewClock, setPreviewClock] = useState(0);
 
-  // Animate preview using the active phase's speed
+  // Resolve current preview frame from clock using proper per-phase timing
+  const resolvePreviewFrame = (): number => {
+    let remaining = previewClock;
+    for (let pi = 0; pi < phases.length; pi++) {
+      const phase = phases[pi];
+      if (phase.frames.length === 0) continue;
+      const frameDuration = 1000 / phase.speed;
+      const cycleDuration = frameDuration * phase.frames.length;
+      if (phase.loops !== undefined) {
+        const phaseTotalTime = cycleDuration * phase.loops;
+        if (remaining < phaseTotalTime) {
+          const t = remaining % cycleDuration;
+          return phase.frames[Math.floor(t / frameDuration)] ?? baseTileId;
+        }
+        remaining -= phaseTotalTime;
+      } else {
+        // Infinite loop
+        const t = remaining % cycleDuration;
+        return phase.frames[Math.floor(t / frameDuration)] ?? baseTileId;
+      }
+    }
+    // All finite phases done — last frame of last phase
+    const lastPhase = phases[phases.length - 1];
+    if (lastPhase && lastPhase.frames.length > 0) {
+      return lastPhase.frames[lastPhase.frames.length - 1] ?? baseTileId;
+    }
+    return baseTileId;
+  };
+
+  const currentPreviewTileId = resolvePreviewFrame();
+
+  // Tick the preview clock — use fastest phase speed for smooth preview
   useEffect(() => {
-    if (allFrames.length < 2) return;
-    const activePhase = phases[activePhaseIdx] ?? phases[0];
-    const speed = activePhase?.speed ?? 4;
+    const totalFrames = phases.reduce((sum, p) => sum + p.frames.length, 0);
+    if (totalFrames < 2) return;
+    const fastestSpeed = Math.max(...phases.map((p) => p.speed), 1);
+    const tickMs = 1000 / fastestSpeed;
     const interval = setInterval(() => {
-      setPreviewFrame((f) => (f + 1) % allFrames.length);
-    }, 1000 / speed);
+      setPreviewClock((c) => c + tickMs);
+    }, tickMs);
     return () => clearInterval(interval);
-  }, [allFrames.length, phases, activePhaseIdx]);
+  }, [phases]);
 
   // Draw preview
   useEffect(() => {
@@ -65,11 +90,11 @@ export function AnimationDialog({ baseTileId, onClose }: AnimationDialogProps) {
     canvas.height = sz;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, sz, sz);
-    const id = allFrames[previewFrame] ?? baseTileId;
+    const id = currentPreviewTileId;
     if (id >= 0 && id < tileset.tileImages.length) {
       ctx.drawImage(tileset.tileImages[id], 0, 0, sz, sz);
     }
-  }, [tileset, allFrames, previewFrame, baseTileId, tileSize]);
+  }, [tileset, currentPreviewTileId, baseTileId, tileSize]);
 
   const updatePhase = (idx: number, patch: Partial<AnimationPhase>) => {
     setPhases((prev) => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));

@@ -8,6 +8,7 @@ function resolveAnimatedTile(
   tileId: number,
   animations: Record<string, TileAnimation> | undefined,
   clock: number,
+  tileCount: number,
 ): number {
   if (!animations) return tileId;
   const raw = animations[String(tileId)];
@@ -15,7 +16,7 @@ function resolveAnimatedTile(
   const anim = migrateTileAnimation(raw);
   if (anim.phases.length === 0) return tileId;
 
-  // Walk through phases, consuming clock time
+  let resolved = tileId;
   let remaining = clock;
   for (let pi = 0; pi < anim.phases.length; pi++) {
     const phase = anim.phases[pi];
@@ -27,22 +28,22 @@ function resolveAnimatedTile(
       const phaseTotalTime = cycleDuration * phase.loops;
       if (remaining < phaseTotalTime) {
         const t = remaining % cycleDuration;
-        return phase.frames[Math.floor(t / frameDuration)] ?? tileId;
+        resolved = phase.frames[Math.floor(t / frameDuration)] ?? tileId;
+        return resolved < tileCount ? resolved : tileId;
       }
       remaining -= phaseTotalTime;
     } else {
-      // Infinite loop — absorbs all remaining time
       const t = remaining % cycleDuration;
-      return phase.frames[Math.floor(t / frameDuration)] ?? tileId;
+      resolved = phase.frames[Math.floor(t / frameDuration)] ?? tileId;
+      return resolved < tileCount ? resolved : tileId;
     }
   }
 
-  // All finite phases exhausted — hold last frame of last phase
   const lastPhase = anim.phases[anim.phases.length - 1];
   if (lastPhase && lastPhase.frames.length > 0) {
-    return lastPhase.frames[lastPhase.frames.length - 1] ?? tileId;
+    resolved = lastPhase.frames[lastPhase.frames.length - 1] ?? tileId;
   }
-  return tileId;
+  return resolved < tileCount ? resolved : tileId;
 }
 
 const GRID_COLOR = '#45475a';
@@ -91,7 +92,8 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
             const dataIdx = y * scene.width + x;
             const rawTileId = layer.data[dataIdx];
             if (rawTileId < 0) continue;
-            const tileId = resolveAnimatedTile(rawTileId, animations, animClock);
+            const tileCount = tileset?.tileImages.length ?? 0;
+            const tileId = resolveAnimatedTile(rawTileId, animations, animClock, tileCount);
             const px = x * ts * zoom;
             const py = y * ts * zoom;
             const sz = ts * zoom;
