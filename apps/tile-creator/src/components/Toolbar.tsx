@@ -5,6 +5,7 @@ const TOOL_LABELS: Record<Tool, string> = {
   paint: 'Paint',
   erase: 'Erase',
   select: 'Select',
+  colorPaint: 'Color',
 };
 
 export function Toolbar() {
@@ -13,6 +14,9 @@ export function Toolbar() {
   const currentRotation = useEditorStore((s) => s.currentRotation);
   const currentFlipH = useEditorStore((s) => s.currentFlipH);
   const currentFlipV = useEditorStore((s) => s.currentFlipV);
+  const currentColor = useEditorStore((s) => s.currentColor);
+  const selectedTileId = useEditorStore((s) => s.selectedTileId);
+  const tileset = useEditorStore((s) => s.tileset);
   const hasSelection = useEditorStore((s) => s.selectionBounds !== null || s.clipboard !== null);
   const setActiveTool = useEditorStore((s) => s.setActiveTool);
   const setZoom = useEditorStore((s) => s.setZoom);
@@ -20,6 +24,9 @@ export function Toolbar() {
   const toggleFlipH = useEditorStore((s) => s.toggleFlipH);
   const toggleFlipV = useEditorStore((s) => s.toggleFlipV);
   const clearSelection = useEditorStore((s) => s.clearSelection);
+  const setColor = useEditorStore((s) => s.setColor);
+
+  const paintDisabled = activeTool === 'paint' && (selectedTileId < 0 || !tileset);
 
   return (
     <div
@@ -35,7 +42,7 @@ export function Toolbar() {
       <span style={{ fontSize: 14, fontWeight: 600, marginRight: 8 }}>
         Tile Creator
       </span>
-      {(['paint', 'erase', 'select'] as Tool[]).map((tool) => (
+      {(['paint', 'erase', 'select', 'colorPaint'] as Tool[]).map((tool) => (
         <button
           key={tool}
           className={activeTool === tool ? 'active' : ''}
@@ -44,6 +51,17 @@ export function Toolbar() {
           {TOOL_LABELS[tool]}
         </button>
       ))}
+      {activeTool === 'colorPaint' && (
+        <input
+          type="color"
+          value={currentColor}
+          onChange={(e) => setColor(e.target.value)}
+          style={{ width: 28, height: 24, padding: 0, border: '1px solid #45475a', cursor: 'pointer' }}
+        />
+      )}
+      {paintDisabled && (
+        <span style={{ fontSize: 11, color: '#f9e2af' }}>Select a tile first</span>
+      )}
       {hasSelection && (
         <button onClick={clearSelection} style={{ color: '#f38ba8' }}>
           Clear

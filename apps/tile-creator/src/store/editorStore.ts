@@ -81,6 +81,8 @@ export const useEditorStore = create<EditorStore>()(
       currentFlipH: false,
       currentFlipV: false,
       prefabLibrary: [],
+      currentColor: '#a6e3a1',
+      colorTileMap: {},
 
       paintTile(x: number, y: number) {
         const { scene, activeLayerIndex, selectedTileId, tileset, currentRotation, currentFlipH, currentFlipV } = get();
@@ -471,6 +473,132 @@ export const useEditorStore = create<EditorStore>()(
           set({ prefabLibrary: prefabs });
         } catch (err) {
           logger.warn('Failed to load prefab library', { error: String(err) });
+        }
+      },
+
+      setColor(color: string) {
+        set({ currentColor: color });
+      },
+
+      async paintColor(x: number, y: number) {
+        const { scene, activeLayerIndex, tileset, currentColor, colorTileMap, currentRotation, currentFlipH, currentFlipV } = get();
+        if (x < 0 || x >= scene.width || y < 0 || y >= scene.height) return;
+
+        const ts = scene.tileSize;
+
+        // Check if we already have a tile for this color
+        const existingIdx = colorTileMap[currentColor];
+        if (existingIdx !== undefined && tileset && existingIdx < tileset.tileImages.length) {
+          // Reuse existing color tile
+          const idx = y * scene.width + x;
+          const layer = scene.layers[activeLayerIndex];
+          const transformVal = encodeTransform(currentRotation, currentFlipH, currentFlipV);
+          if (layer.data[idx] === existingIdx && (layer.transforms?.[idx] ?? 0) === transformVal) return;
+          const newData = [...layer.data];
+          newData[idx] = existingIdx;
+          const newTransforms = layer.transforms ? [...layer.transforms] : new Array(scene.width * scene.height).fill(0);
+          newTransforms[idx] = transformVal;
+          const newLayer = { ...layer, data: newData, transforms: newTransforms };
+          const newLayers = [...scene.layers];
+          newLayers[activeLayerIndex] = newLayer;
+          set({ scene: { ...scene, layers: newLayers } });
+          return;
+        }
+
+        // Create a new solid-color tile
+        const canvas = new OffscreenCanvas(ts, ts);
+        const ctx = canvas.getContext('2d')!;
+        ctx.fillStyle = currentColor;
+        ctx.fillRect(0, 0, ts, ts);
+        const bmp = await createImageBitmap(canvas);
+
+        const oldTileImages = tileset?.tileImages ?? [];
+        const newTileImages = [...oldTileImages, bmp];
+        const newTileIdx = newTileImages.length - 1;
+        const columns = Math.min(newTileImages.length, 8);
+        const ref = tileset?.ref
+          ? { ...tileset.ref, columns }
+          : { name: 'color-tiles', tileSize: ts, image: '', columns };
+
+        const newTileset: TilesetState = {
+          ref,
+          imageDataUrl: tileset?.imageDataUrl ?? '',
+          tileImages: newTileImages,
+        };
+
+        const idx = y * scene.width + x;
+        const layer = scene.layers[activeLayerIndex];
+        const newData = [...layer.data];
+        newData[idx] = newTileIdx;
+        const transformVal = encodeTransform(currentRotation, currentFlipH, currentFlipV);
+        const newTransforms = layer.transforms ? [...layer.transforms] : new Array(scene.width * scene.height).fill(0);
+        newTransforms[idx] = transformVal;
+        const newLayer = { ...layer, data: newData, transforms: newTransforms };
+        const newLayers = [...scene.layers];
+        newLayers[activeLayerIndex] = newLayer;
+
+        set({
+          tileset: newTileset,
+          scene: { ...scene, layers: newLayers, tileset: ref },
+          colorTileMap: { ...colorTileMap, [currentColor]: newTileIdx },
+        });
+      },
+
+      async autoTileImage(image: HTMLImageElement, tileSize: number) {
+        try {
+          const { autoTileImage: autoTile } = await import('../lib/autoTiler.js');
+          const result = await autoTile(image, tileSize);
+
+          const columns = Math.min(result.uniqueTiles.length, 16);
+          const ref = { name: 'auto-tiled', tileSize, image: '', columns };
+          const newTileset: TilesetState = {
+            ref,
+            imageDataUrl: '',
+            tileImages: result.uniqueTiles,
+          };
+
+          // Resize scene to match the image grid
+          const newLayer: TileLayer = {
+            name: 'auto-tiled',
+            data: result.tileMap,
+            transforms: new Array(result.columns * result.rows).fill(0),
+          };
+
+          const newScene: SceneJSON = {
+            version: 1,
+            width: result.columns,
+            height: result.rows,
+            tileSize,
+            layers: [newLayer, {
+              name: 'overlay',
+              data: new Array(result.columns * result.rows).fill(-1),
+            }],
+            tileset: ref,
+          };
+
+          set({
+            tileset: newTileset,
+            scene: newScene,
+            selectedTileId: 0,
+            activeLayerIndex: 0,
+            layerVisibility: [true, true],
+            clipboard: null,
+            selectionBounds: null,
+            colorTileMap: {},
+          });
+
+          const total = result.columns * result.rows;
+          const unique = result.uniqueTiles.length;
+          const pct = Math.round((1 - unique / total) * 100);
+          logger.info('Auto-tiled image', {
+            total, unique, reduction: `${pct}%`,
+            gridSize: `${result.columns}x${result.rows}`,
+          });
+
+          return { total, unique, pct };
+        } catch (err) {
+          logger.warn('Auto-tile failed', { error: String(err) });
+          throw err;
         }
       },
 

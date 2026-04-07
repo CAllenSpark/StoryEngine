@@ -9,6 +9,7 @@ interface ImportDialogProps {
   selectedTileSize: number;
   onSelectTileSize: (size: number) => void;
   onConfirm: () => void;
+  onAutoTile: () => void;
   onCancel: () => void;
 }
 
@@ -18,7 +19,7 @@ export function ImportDialog(props: ImportDialogProps) {
   const {
     imageDataUrl, imageWidth, imageHeight, fileName,
     detectedSizes, selectedTileSize,
-    onSelectTileSize, onConfirm, onCancel,
+    onSelectTileSize, onConfirm, onAutoTile, onCancel,
   } = props;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -136,6 +137,9 @@ export function ImportDialog(props: ImportDialogProps) {
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button onClick={onCancel}>Cancel</button>
+          <button onClick={onAutoTile} disabled={tileCount === 0}>
+            Auto-Tile (deduplicate)
+          </button>
           <button className="active" onClick={onConfirm} disabled={tileCount === 0}>
             Confirm ({tileCount} tiles)
           </button>

@@ -166,6 +166,21 @@ export function TilesetPanel() {
           selectedTileSize={dialogState.selectedTileSize}
           onSelectTileSize={setSelectedTileSize}
           onConfirm={() => commitImport(dialogState.selectedTileSize)}
+          onAutoTile={async () => {
+            if (!dialogState.imageDataUrl) return;
+            try {
+              const img = new Image();
+              await new Promise<void>((resolve, reject) => {
+                img.onload = () => resolve();
+                img.onerror = () => reject(new Error('Failed to load'));
+                img.src = dialogState.imageDataUrl!;
+              });
+              await useEditorStore.getState().autoTileImage(img, dialogState.selectedTileSize);
+              closeDialog();
+            } catch (err) {
+              console.error('Auto-tile failed', err);
+            }
+          }}
           onCancel={closeDialog}
         />
       )}

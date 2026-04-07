@@ -168,9 +168,10 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
 
   const applyTool = useCallback(
     (gx: number, gy: number) => {
-      const { activeTool, paintTile, eraseTile } = useEditorStore.getState();
+      const { activeTool, paintTile, eraseTile, paintColor } = useEditorStore.getState();
       if (activeTool === 'paint') paintTile(gx, gy);
       else if (activeTool === 'erase') eraseTile(gx, gy);
+      else if (activeTool === 'colorPaint') paintColor(gx, gy);
     },
     [],
   );

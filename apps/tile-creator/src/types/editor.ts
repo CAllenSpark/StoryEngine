@@ -1,7 +1,7 @@
 import type { SceneJSON, SceneCollection, TilesetRef } from '@storyengine/shared';
 import type { StoredTileset } from '../lib/assetDb.js';
 
-export type Tool = 'paint' | 'erase' | 'select';
+export type Tool = 'paint' | 'erase' | 'select' | 'colorPaint';
 
 export interface ImportWarning {
   level: 'info' | 'warn';
@@ -56,6 +56,8 @@ export interface EditorState {
   currentFlipH: boolean;
   currentFlipV: boolean;
   prefabLibrary: Prefab[];
+  currentColor: string;
+  colorTileMap: Record<string, number>;
 }
 
 export interface EditorActions {
@@ -98,6 +100,9 @@ export interface EditorActions {
   loadPrefab: (id: string) => Promise<void>;
   deletePrefab: (id: string) => Promise<void>;
   loadPrefabLibrary: () => Promise<void>;
+  setColor: (color: string) => void;
+  paintColor: (x: number, y: number) => Promise<void>;
+  autoTileImage: (image: HTMLImageElement, tileSize: number) => Promise<void>;
 }
 
 export type EditorStore = EditorState & EditorActions;

@@ -21,6 +21,8 @@ function resetStore() {
     selectionBounds: null,
     clipboard: null,
     prefabLibrary: [],
+    currentColor: '#a6e3a1',
+    colorTileMap: {},
   });
   useEditorStore.temporal.getState().clear();
 }
@@ -428,6 +430,18 @@ describe('editorStore', () => {
       expect(useEditorStore.getState().selectedTileId).toBe(0);
       expect(useEditorStore.getState().clipboard).toBeNull();
       expect(useEditorStore.getState().selectionBounds).toBeNull();
+    });
+  });
+
+  describe('color paint', () => {
+    it('setColor updates currentColor', () => {
+      useEditorStore.getState().setColor('#ff0000');
+      expect(useEditorStore.getState().currentColor).toBe('#ff0000');
+    });
+
+    it('tool type includes colorPaint', () => {
+      useEditorStore.getState().setActiveTool('colorPaint');
+      expect(useEditorStore.getState().activeTool).toBe('colorPaint');
     });
   });
 });
