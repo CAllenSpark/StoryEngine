@@ -46,6 +46,32 @@ function resolveAnimatedTile(
   return resolved < tileCount ? resolved : tileId;
 }
 
+function resolveGroupFrame(
+  group: import('@storyengine/shared').GroupAnimation,
+  clock: number,
+): import('@storyengine/shared').GroupAnimationFrame | null {
+  let remaining = clock;
+  for (const phase of group.phases) {
+    if (phase.frames.length === 0) continue;
+    const frameDuration = 1000 / phase.speed;
+    const cycleDuration = frameDuration * phase.frames.length;
+    if (phase.loops !== undefined) {
+      const total = cycleDuration * phase.loops;
+      if (remaining < total) {
+        return phase.frames[Math.floor((remaining % cycleDuration) / frameDuration)] ?? null;
+      }
+      remaining -= total;
+    } else {
+      return phase.frames[Math.floor((remaining % cycleDuration) / frameDuration)] ?? null;
+    }
+  }
+  const lastPhase = group.phases[group.phases.length - 1];
+  if (lastPhase && lastPhase.frames.length > 0) {
+    return lastPhase.frames[lastPhase.frames.length - 1] ?? null;
+  }
+  return null;
+}
+
 const GRID_COLOR = '#45475a';
 const HOVER_COLOR = 'rgba(137, 180, 250, 0.3)';
 const PLACEHOLDER_COLORS = [
@@ -84,6 +110,23 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
       ctx.fillStyle = '#1a1a2e';
       ctx.fillRect(0, 0, w, h);
 
+      // Build group animation overlay
+      const groupOverlay = new Map<string, number>();
+      for (const group of scene.groupAnimations ?? []) {
+        const frame = resolveGroupFrame(group, animClock);
+        if (!frame) continue;
+        for (let gy = 0; gy < group.height; gy++) {
+          for (let gx = 0; gx < group.width; gx++) {
+            const tid = frame.tiles[gy * group.width + gx];
+            if (tid !== undefined && tid >= 0) {
+              groupOverlay.set(`${group.x + gx},${group.y + gy}:${group.layer}`, tid);
+            }
+          }
+        }
+      }
+
+      const tileCount = tileset?.tileImages.length ?? 0;
+
       for (let li = 0; li < scene.layers.length; li++) {
         if (!layerVisibility[li]) continue;
         const layer = scene.layers[li];
@@ -91,9 +134,13 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
           for (let x = 0; x < scene.width; x++) {
             const dataIdx = y * scene.width + x;
             const rawTileId = layer.data[dataIdx];
-            if (rawTileId < 0) continue;
-            const tileCount = tileset?.tileImages.length ?? 0;
-            const tileId = resolveAnimatedTile(rawTileId, animations, animClock, tileCount);
+            // Check group overlay first
+            const groupTile = groupOverlay.get(`${x},${y}:${li}`);
+            const baseTile = groupTile !== undefined ? groupTile : rawTileId;
+            if (baseTile < 0) continue;
+            const tileId = groupTile !== undefined
+              ? groupTile
+              : resolveAnimatedTile(rawTileId, animations, animClock, tileCount);
             const px = x * ts * zoom;
             const py = y * ts * zoom;
             const sz = ts * zoom;

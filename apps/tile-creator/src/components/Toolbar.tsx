@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
 import { AnimationDialog } from './AnimationDialog.js';
+import { GroupAnimationDialog } from './GroupAnimationDialog.js';
 import type { Tool } from '../types/editor.js';
 
 const TOOL_LABELS: Record<Tool, string> = {
@@ -28,8 +29,11 @@ export function Toolbar() {
   const clearSelection = useEditorStore((s) => s.clearSelection);
   const setColor = useEditorStore((s) => s.setColor);
   const [showAnimDialog, setShowAnimDialog] = useState(false);
+  const [groupAnimId, setGroupAnimId] = useState<string | null>(null);
+  const selectionBounds = useEditorStore((s) => s.selectionBounds);
 
   const paintDisabled = activeTool === 'paint' && (selectedTileId < 0 || !tileset);
+  const canAnimate = selectionBounds !== null || (selectedTileId >= 0 && !!tileset);
 
   return (
     <div
@@ -78,10 +82,17 @@ export function Toolbar() {
       )}
       <span style={{ marginLeft: 8, fontSize: 12, color: '#6c7086' }}>|</span>
       <button
-        disabled={selectedTileId < 0 || !tileset}
-        onClick={() => setShowAnimDialog(true)}
+        disabled={!canAnimate}
+        onClick={() => {
+          if (selectionBounds) {
+            const id = useEditorStore.getState().addGroupAnimation('Group Animation');
+            if (id) setGroupAnimId(id);
+          } else {
+            setShowAnimDialog(true);
+          }
+        }}
       >
-        Animate
+        Animate{selectionBounds ? ' Group' : ''}
       </button>
       <button onClick={() => setRotation((currentRotation + 1) % 4)}>
         Rotate: {currentRotation * 90}&deg;
@@ -102,6 +113,12 @@ export function Toolbar() {
         <AnimationDialog
           baseTileId={selectedTileId}
           onClose={() => setShowAnimDialog(false)}
+        />
+      )}
+      {groupAnimId && (
+        <GroupAnimationDialog
+          groupId={groupAnimId}
+          onClose={() => setGroupAnimId(null)}
         />
       )}
     </div>

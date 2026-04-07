@@ -1,4 +1,4 @@
-import type { TileLayer, TileAnimation } from '@storyengine/shared';
+import type { TileLayer, TileAnimation, GroupAnimation, GroupAnimationPhase } from '@storyengine/shared';
 import { migrateTileAnimation } from '@storyengine/shared';
 
 interface AnimInstanceState {
@@ -12,6 +12,9 @@ interface AnimInstanceState {
 export class Tilemap {
   private animations: Map<number, TileAnimation> = new Map();
   private animStates: Map<number, AnimInstanceState> = new Map();
+  private groupAnims: GroupAnimation[] = [];
+  private groupStates: Map<string, AnimInstanceState> = new Map();
+  private groupOverlay: Map<string, number> = new Map();
 
   constructor(
     readonly width: number,
@@ -41,64 +44,61 @@ export class Tilemap {
     for (const [key, raw] of Object.entries(anims)) {
       const anim = migrateTileAnimation(raw);
       if (anim.phases.length === 0) continue;
-      // Skip single-phase single-frame animations
       if (anim.phases.length === 1 && anim.phases[0].frames.length < 2) continue;
       const id = Number(key);
       this.animations.set(id, anim);
-      this.animStates.set(id, {
-        currentPhase: 0,
-        loopsCompleted: 0,
-        frameIndex: 0,
-        phaseAccum: 0,
-        finished: false,
-      });
+      this.animStates.set(id, newAnimState());
+    }
+  }
+
+  setGroupAnimations(groups: GroupAnimation[] | undefined): void {
+    this.groupAnims = groups ?? [];
+    this.groupStates.clear();
+    this.groupOverlay.clear();
+    for (const g of this.groupAnims) {
+      if (g.phases.length === 0) continue;
+      this.groupStates.set(g.id, newAnimState());
     }
   }
 
   updateAnimations(dt: number): void {
-    if (this.animations.size === 0) return;
+    // Per-tile animations
+    for (const [, anim] of this.animations) {
+      // Find state by iterating (we need baseTileId as key)
+    }
     for (const [baseTileId, anim] of this.animations) {
       const state = this.animStates.get(baseTileId)!;
-      if (state.finished) continue;
+      advancePhased(state, anim.phases.map((p) => ({ frameCount: p.frames.length, speed: p.speed, loops: p.loops })), dt);
+    }
 
-      const phase = anim.phases[state.currentPhase];
-      if (!phase || phase.frames.length === 0) {
-        state.finished = true;
-        continue;
-      }
+    // Group animations — rebuild overlay
+    this.groupOverlay.clear();
+    for (const g of this.groupAnims) {
+      const state = this.groupStates.get(g.id);
+      if (!state) continue;
+      advancePhased(state, g.phases.map((p) => ({ frameCount: p.frames.length, speed: p.speed, loops: p.loops })), dt);
 
-      state.phaseAccum += dt;
-      const frameDuration = 1000 / phase.speed;
-      const phaseCycleDuration = frameDuration * phase.frames.length;
+      const phase = g.phases[state.currentPhase];
+      if (!phase) continue;
+      const frame = phase.frames[state.frameIndex];
+      if (!frame) continue;
 
-      if (phase.loops !== undefined) {
-        // Finite loops
-        const totalPhaseTime = phaseCycleDuration * phase.loops;
-        if (state.phaseAccum >= totalPhaseTime) {
-          // Phase complete — advance to next or finish
-          if (state.currentPhase + 1 < anim.phases.length) {
-            state.currentPhase++;
-            state.phaseAccum = state.phaseAccum - totalPhaseTime;
-            state.loopsCompleted = 0;
-            state.frameIndex = 0;
-          } else {
-            // Last phase done — hold final frame
-            state.finished = true;
-            state.frameIndex = phase.frames.length - 1;
+      for (let gy = 0; gy < g.height; gy++) {
+        for (let gx = 0; gx < g.width; gx++) {
+          const tileId = frame.tiles[gy * g.width + gx];
+          if (tileId !== undefined && tileId >= 0) {
+            this.groupOverlay.set(`${g.x + gx},${g.y + gy}:${g.layer}`, tileId);
           }
-        } else {
-          const t = state.phaseAccum % phaseCycleDuration;
-          state.frameIndex = Math.floor(t / frameDuration);
         }
-      } else {
-        // Infinite loop
-        const t = state.phaseAccum % phaseCycleDuration;
-        state.frameIndex = Math.floor(t / frameDuration);
       }
     }
   }
 
-  resolveAnimatedTile(tileId: number): number {
+  resolveAnimatedTile(tileId: number, x?: number, y?: number, layerIndex?: number): number {
+    if (x !== undefined && y !== undefined && layerIndex !== undefined) {
+      const groupTile = this.groupOverlay.get(`${x},${y}:${layerIndex}`);
+      if (groupTile !== undefined) return groupTile;
+    }
     const anim = this.animations.get(tileId);
     if (!anim) return tileId;
     const state = this.animStates.get(tileId);
@@ -109,6 +109,43 @@ export class Tilemap {
   }
 
   get hasAnimations(): boolean {
-    return this.animations.size > 0;
+    return this.animations.size > 0 || this.groupAnims.length > 0;
+  }
+}
+
+function newAnimState(): AnimInstanceState {
+  return { currentPhase: 0, loopsCompleted: 0, frameIndex: 0, phaseAccum: 0, finished: false };
+}
+
+function advancePhased(
+  state: AnimInstanceState,
+  phases: { frameCount: number; speed: number; loops?: number }[],
+  dt: number,
+): void {
+  if (state.finished) return;
+  const phase = phases[state.currentPhase];
+  if (!phase || phase.frameCount === 0) { state.finished = true; return; }
+
+  state.phaseAccum += dt;
+  const frameDuration = 1000 / phase.speed;
+  const cycleDuration = frameDuration * phase.frameCount;
+
+  if (phase.loops !== undefined) {
+    const totalTime = cycleDuration * phase.loops;
+    if (state.phaseAccum >= totalTime) {
+      if (state.currentPhase + 1 < phases.length) {
+        state.currentPhase++;
+        state.phaseAccum -= totalTime;
+        state.loopsCompleted = 0;
+        state.frameIndex = 0;
+      } else {
+        state.finished = true;
+        state.frameIndex = phase.frameCount - 1;
+      }
+    } else {
+      state.frameIndex = Math.floor((state.phaseAccum % cycleDuration) / frameDuration);
+    }
+  } else {
+    state.frameIndex = Math.floor((state.phaseAccum % cycleDuration) / frameDuration);
   }
 }

@@ -40,13 +40,14 @@ export class PixiRenderer implements IRenderer {
   }
 
   drawTilemap(tilemap: Tilemap, camera: { x: number; y: number }): void {
-    for (const layer of tilemap.layers) {
+    for (let li = 0; li < tilemap.layers.length; li++) {
+      const layer = tilemap.layers[li];
       for (let y = 0; y < tilemap.height; y++) {
         for (let x = 0; x < tilemap.width; x++) {
           const idx = y * tilemap.width + x;
           const rawTileId = layer.data[idx];
           if (rawTileId === undefined || rawTileId < 0) continue;
-          const tileId = tilemap.resolveAnimatedTile(rawTileId);
+          const tileId = tilemap.resolveAnimatedTile(rawTileId, x, y, li);
 
           const tex = this.tileTextures.get(tileId);
           if (!tex) continue;

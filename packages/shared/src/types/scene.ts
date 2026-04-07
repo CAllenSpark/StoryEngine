@@ -32,6 +32,27 @@ export interface TileLayer {
   transforms?: number[];
 }
 
+export interface GroupAnimationFrame {
+  tiles: number[];
+}
+
+export interface GroupAnimationPhase {
+  frames: GroupAnimationFrame[];
+  speed: number;
+  loops?: number;
+}
+
+export interface GroupAnimation {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  phases: GroupAnimationPhase[];
+  layer: number;
+}
+
 export interface SceneJSON {
   version: number;
   width: number;
@@ -39,6 +60,7 @@ export interface SceneJSON {
   tileSize: number;
   layers: TileLayer[];
   tileset: TilesetRef;
+  groupAnimations?: GroupAnimation[];
 }
 
 /**

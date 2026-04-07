@@ -1,4 +1,4 @@
-import type { SceneJSON, SceneCollection, TilesetRef, AnimationPhase } from '@storyengine/shared';
+import type { SceneJSON, SceneCollection, TilesetRef, AnimationPhase, GroupAnimationPhase, GroupAnimation } from '@storyengine/shared';
 import type { StoredTileset } from '../lib/assetDb.js';
 
 export type Tool = 'paint' | 'erase' | 'select' | 'colorPaint';
@@ -67,6 +67,7 @@ export interface EditorState {
   colorTileMap: Record<string, number>;
   animClock: number;
   animationLibrary: StoredAnimation[];
+  editingGroupAnimationId: string | null;
 }
 
 export interface EditorActions {
@@ -122,6 +123,10 @@ export interface EditorActions {
   loadAnimationLibrary: () => Promise<void>;
   deleteAnimationFromLibrary: (id: string) => Promise<void>;
   applyLibraryAnimation: (animId: string, baseTileId: number) => void;
+  addGroupAnimation: (name: string) => string | null;
+  updateGroupAnimation: (id: string, phases: GroupAnimationPhase[]) => void;
+  removeGroupAnimation: (id: string) => void;
+  captureGroupFrame: (groupId: string) => void;
 }
 
 export type EditorStore = EditorState & EditorActions;

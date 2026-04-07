@@ -85,6 +85,7 @@ export const useEditorStore = create<EditorStore>()(
       colorTileMap: {},
       animClock: 0,
       animationLibrary: [],
+      editingGroupAnimationId: null,
 
       paintTile(x: number, y: number) {
         const { scene, activeLayerIndex, selectedTileId, tileset, currentRotation, currentFlipH, currentFlipV } = get();
@@ -624,6 +625,86 @@ export const useEditorStore = create<EditorStore>()(
           tileset: { ...tileset, ref },
           scene: { ...scene, tileset: ref },
         });
+      },
+
+      addGroupAnimation(name: string): string | null {
+        const { scene, activeLayerIndex, selectionBounds } = get();
+        if (!selectionBounds) return null;
+        const { x1, y1, x2, y2 } = selectionBounds;
+        const w = x2 - x1 + 1;
+        const h = y2 - y1 + 1;
+        const layer = scene.layers[activeLayerIndex];
+
+        // Capture current tiles as frame 1
+        const tiles: number[] = [];
+        for (let y = y1; y <= y2; y++) {
+          for (let x = x1; x <= x2; x++) {
+            tiles.push(layer.data[y * scene.width + x]);
+          }
+        }
+
+        const id = crypto.randomUUID();
+        const group: import('@storyengine/shared').GroupAnimation = {
+          id,
+          name,
+          x: x1,
+          y: y1,
+          width: w,
+          height: h,
+          phases: [{ frames: [{ tiles }], speed: 4 }],
+          layer: activeLayerIndex,
+        };
+
+        const groups = [...(scene.groupAnimations ?? []), group];
+        set({
+          scene: { ...scene, groupAnimations: groups },
+          selectionBounds: null,
+          editingGroupAnimationId: id,
+        });
+        return id;
+      },
+
+      updateGroupAnimation(id: string, phases: import('@storyengine/shared').GroupAnimationPhase[]) {
+        const { scene } = get();
+        const groups = (scene.groupAnimations ?? []).map((g) =>
+          g.id === id ? { ...g, phases } : g,
+        );
+        set({ scene: { ...scene, groupAnimations: groups } });
+      },
+
+      removeGroupAnimation(id: string) {
+        const { scene } = get();
+        const groups = (scene.groupAnimations ?? []).filter((g) => g.id !== id);
+        set({
+          scene: { ...scene, groupAnimations: groups.length > 0 ? groups : undefined },
+          editingGroupAnimationId: null,
+        });
+      },
+
+      captureGroupFrame(groupId: string) {
+        const { scene, activeLayerIndex } = get();
+        const groups = scene.groupAnimations ?? [];
+        const group = groups.find((g) => g.id === groupId);
+        if (!group) return;
+        const layer = scene.layers[activeLayerIndex];
+
+        const tiles: number[] = [];
+        for (let y = group.y; y < group.y + group.height; y++) {
+          for (let x = group.x; x < group.x + group.width; x++) {
+            tiles.push(layer.data[y * scene.width + x]);
+          }
+        }
+
+        // Add frame to the last phase
+        const updatedGroups = groups.map((g) => {
+          if (g.id !== groupId) return g;
+          const phases = [...g.phases];
+          const lastPhase = { ...phases[phases.length - 1] };
+          lastPhase.frames = [...lastPhase.frames, { tiles }];
+          phases[phases.length - 1] = lastPhase;
+          return { ...g, phases };
+        });
+        set({ scene: { ...scene, groupAnimations: updatedGroups } });
       },
 
       async paintColor(x: number, y: number) {

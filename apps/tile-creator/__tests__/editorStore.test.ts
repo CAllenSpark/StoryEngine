@@ -25,6 +25,7 @@ function resetStore() {
     colorTileMap: {},
     animClock: 0,
     animationLibrary: [],
+    editingGroupAnimationId: null,
   });
   useEditorStore.temporal.getState().clear();
 }
@@ -520,6 +521,71 @@ describe('editorStore', () => {
       expect(useEditorStore.getState().animClock).toBe(250);
       useEditorStore.getState().tickAnimation();
       expect(useEditorStore.getState().animClock).toBe(500);
+    });
+  });
+
+  describe('group animation', () => {
+    it('addGroupAnimation captures tiles from selection', () => {
+      const { setSelectedTile, paintTile, selectArea } = useEditorStore.getState();
+      setSelectedTile(5);
+      paintTile(0, 0);
+      paintTile(1, 0);
+      paintTile(0, 1);
+      paintTile(1, 1);
+      selectArea(0, 0, 1, 1);
+      const id = useEditorStore.getState().addGroupAnimation('bookcase');
+      expect(id).not.toBeNull();
+      const groups = useEditorStore.getState().scene.groupAnimations;
+      expect(groups).toHaveLength(1);
+      expect(groups![0].width).toBe(2);
+      expect(groups![0].height).toBe(2);
+      expect(groups![0].phases[0].frames[0].tiles).toEqual([5, 5, 5, 5]);
+      expect(groups![0].name).toBe('bookcase');
+    });
+
+    it('captureGroupFrame adds a frame to the last phase', () => {
+      const { setSelectedTile, paintTile, selectArea } = useEditorStore.getState();
+      setSelectedTile(1);
+      paintTile(0, 0);
+      paintTile(1, 0);
+      selectArea(0, 0, 1, 0);
+      const id = useEditorStore.getState().addGroupAnimation('test');
+      expect(id).not.toBeNull();
+
+      // Paint different tiles and capture
+      setSelectedTile(9);
+      paintTile(0, 0);
+      paintTile(1, 0);
+      useEditorStore.getState().captureGroupFrame(id!);
+
+      const groups = useEditorStore.getState().scene.groupAnimations!;
+      expect(groups[0].phases[0].frames).toHaveLength(2);
+      expect(groups[0].phases[0].frames[1].tiles).toEqual([9, 9]);
+    });
+
+    it('removeGroupAnimation deletes group', () => {
+      const { setSelectedTile, paintTile, selectArea } = useEditorStore.getState();
+      setSelectedTile(1);
+      paintTile(0, 0);
+      selectArea(0, 0, 0, 0);
+      const id = useEditorStore.getState().addGroupAnimation('test');
+      expect(useEditorStore.getState().scene.groupAnimations).toHaveLength(1);
+      useEditorStore.getState().removeGroupAnimation(id!);
+      expect(useEditorStore.getState().scene.groupAnimations).toBeUndefined();
+    });
+
+    it('updateGroupAnimation updates phases', () => {
+      const { setSelectedTile, paintTile, selectArea } = useEditorStore.getState();
+      setSelectedTile(1);
+      paintTile(0, 0);
+      selectArea(0, 0, 0, 0);
+      const id = useEditorStore.getState().addGroupAnimation('test');
+      useEditorStore.getState().updateGroupAnimation(id!, [
+        { frames: [{ tiles: [1] }, { tiles: [2] }], speed: 8 },
+      ]);
+      const group = useEditorStore.getState().scene.groupAnimations![0];
+      expect(group.phases[0].speed).toBe(8);
+      expect(group.phases[0].frames).toHaveLength(2);
     });
   });
 });
