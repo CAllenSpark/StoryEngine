@@ -75,6 +75,8 @@ export const useEditorStore = create<EditorStore>()(
       currentTilesetId: null,
       currentCollection: null,
       currentSceneId: null,
+      selectionBounds: null,
+      clipboard: null,
 
       paintTile(x: number, y: number) {
         const { scene, activeLayerIndex, selectedTileId, tileset } = get();
@@ -318,6 +320,65 @@ export const useEditorStore = create<EditorStore>()(
         } catch (err) {
           logger.warn('Failed to save tileset to library', { error: String(err) });
         }
+      },
+
+      selectArea(x1: number, y1: number, x2: number, y2: number) {
+        const { scene } = get();
+        const nx1 = Math.max(0, Math.min(x1, x2));
+        const ny1 = Math.max(0, Math.min(y1, y2));
+        const nx2 = Math.min(scene.width - 1, Math.max(x1, x2));
+        const ny2 = Math.min(scene.height - 1, Math.max(y1, y2));
+        set({ selectionBounds: { x1: nx1, y1: ny1, x2: nx2, y2: ny2 } });
+      },
+
+      copySelection() {
+        const { scene, activeLayerIndex, selectionBounds } = get();
+        if (!selectionBounds) return;
+        const { x1, y1, x2, y2 } = selectionBounds;
+        const w = x2 - x1 + 1;
+        const h = y2 - y1 + 1;
+        const layer = scene.layers[activeLayerIndex];
+        const tiles: number[] = [];
+        const transforms: number[] = [];
+        for (let y = y1; y <= y2; y++) {
+          for (let x = x1; x <= x2; x++) {
+            const idx = y * scene.width + x;
+            tiles.push(layer.data[idx]);
+            transforms.push(layer.transforms?.[idx] ?? 0);
+          }
+        }
+        set({ clipboard: { width: w, height: h, tiles, transforms } });
+      },
+
+      stampClipboard(destX: number, destY: number) {
+        const { scene, activeLayerIndex, clipboard } = get();
+        if (!clipboard) return;
+        const layer = scene.layers[activeLayerIndex];
+        const newData = [...layer.data];
+        const newTransforms = layer.transforms
+          ? [...layer.transforms]
+          : new Array(scene.width * scene.height).fill(0);
+        for (let cy = 0; cy < clipboard.height; cy++) {
+          for (let cx = 0; cx < clipboard.width; cx++) {
+            const sx = destX + cx;
+            const sy = destY + cy;
+            if (sx < 0 || sx >= scene.width || sy < 0 || sy >= scene.height) continue;
+            const srcIdx = cy * clipboard.width + cx;
+            const tileId = clipboard.tiles[srcIdx];
+            if (tileId < 0) continue;
+            const destIdx = sy * scene.width + sx;
+            newData[destIdx] = tileId;
+            newTransforms[destIdx] = clipboard.transforms[srcIdx];
+          }
+        }
+        const newLayer = { ...layer, data: newData, transforms: newTransforms };
+        const newLayers = [...scene.layers];
+        newLayers[activeLayerIndex] = newLayer;
+        set({ scene: { ...scene, layers: newLayers } });
+      },
+
+      clearSelection() {
+        set({ selectionBounds: null, clipboard: null });
       },
 
       ...createCollectionActions(set, get),

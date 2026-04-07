@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
 import { useTilesetImport } from '../hooks/useTilesetImport.js';
 import { ImportDialog } from './ImportDialog.js';
@@ -14,6 +14,8 @@ export function TilesetPanel() {
     dialogState, closeDialog, setSelectedTileSize,
   } = useTilesetImport();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [hoveredTileId, setHoveredTileId] = useState<number>(-1);
 
   const tileSize = tileset?.ref.tileSize ?? 16;
   const columns = tileset?.ref.columns ?? 0;
@@ -76,6 +78,34 @@ export function TilesetPanel() {
     [tileset, tileSize, columns, tileCount, setSelectedTile],
   );
 
+  const handlePaletteHover = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!tileset || columns === 0) { setHoveredTileId(-1); return; }
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = Math.floor((e.clientX - rect.left) / (tileSize * PALETTE_SCALE));
+      const y = Math.floor((e.clientY - rect.top) / (tileSize * PALETTE_SCALE));
+      const id = y * columns + x;
+      setHoveredTileId(id >= 0 && id < tileCount ? id : -1);
+    },
+    [tileset, tileSize, columns, tileCount],
+  );
+
+  useEffect(() => {
+    const canvas = previewCanvasRef.current;
+    if (!canvas || !tileset || hoveredTileId < 0 || hoveredTileId >= tileCount) {
+      if (canvas) canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const sz = tileSize * 4;
+    canvas.width = sz;
+    canvas.height = sz;
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, sz, sz);
+    ctx.drawImage(tileset.tileImages[hoveredTileId], 0, 0, sz, sz);
+  }, [tileset, hoveredTileId, tileSize, tileCount]);
+
   return (
     <div
       style={{
@@ -99,11 +129,24 @@ export function TilesetPanel() {
         </div>
       )}
       {tileset ? (
-        <canvas
-          ref={canvasRef}
-          onClick={handlePaletteClick}
-          style={{ imageRendering: 'pixelated', cursor: 'pointer' }}
-        />
+        <>
+          <canvas
+            ref={canvasRef}
+            onClick={handlePaletteClick}
+            onMouseMove={handlePaletteHover}
+            onMouseLeave={() => setHoveredTileId(-1)}
+            style={{ imageRendering: 'pixelated', cursor: 'pointer' }}
+          />
+          {hoveredTileId >= 0 && hoveredTileId < tileCount && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+              <canvas
+                ref={previewCanvasRef}
+                style={{ imageRendering: 'pixelated', border: '1px solid #313244' }}
+              />
+              <span style={{ fontSize: 11, color: '#a6adc8' }}>Tile #{hoveredTileId}</span>
+            </div>
+          )}
+        </>
       ) : (
         <span style={{ fontSize: 12, color: '#6c7086' }}>
           No tileset loaded. Import an image to get started.

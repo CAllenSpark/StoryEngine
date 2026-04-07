@@ -15,6 +15,8 @@ function resetStore() {
     currentTilesetId: null,
     currentCollection: null,
     currentSceneId: null,
+    selectionBounds: null,
+    clipboard: null,
   });
   useEditorStore.temporal.getState().clear();
 }
@@ -270,6 +272,66 @@ describe('editorStore', () => {
       const sceneBefore = useEditorStore.getState().scene;
       useEditorStore.getState().rotateTileAt(0, 0);
       expect(useEditorStore.getState().scene).toBe(sceneBefore);
+    });
+  });
+
+  describe('selection/stamp', () => {
+    it('selectArea normalizes coordinates', () => {
+      useEditorStore.getState().selectArea(5, 3, 2, 1);
+      const bounds = useEditorStore.getState().selectionBounds;
+      expect(bounds).toEqual({ x1: 2, y1: 1, x2: 5, y2: 3 });
+    });
+
+    it('selectArea clamps to scene bounds', () => {
+      useEditorStore.getState().selectArea(-5, -5, 100, 100);
+      const bounds = useEditorStore.getState().selectionBounds;
+      expect(bounds).toEqual({ x1: 0, y1: 0, x2: 19, y2: 10 });
+    });
+
+    it('copySelection captures tiles from active layer', () => {
+      const { setSelectedTile, paintTile } = useEditorStore.getState();
+      setSelectedTile(3);
+      paintTile(1, 1);
+      paintTile(2, 1);
+      useEditorStore.getState().selectArea(1, 1, 2, 1);
+      useEditorStore.getState().copySelection();
+      const clip = useEditorStore.getState().clipboard;
+      expect(clip).not.toBeNull();
+      expect(clip!.width).toBe(2);
+      expect(clip!.height).toBe(1);
+      expect(clip!.tiles).toEqual([3, 3]);
+    });
+
+    it('stampClipboard writes at destination', () => {
+      const { setSelectedTile, paintTile } = useEditorStore.getState();
+      setSelectedTile(7);
+      paintTile(0, 0);
+      useEditorStore.getState().selectArea(0, 0, 0, 0);
+      useEditorStore.getState().copySelection();
+      useEditorStore.getState().stampClipboard(5, 5);
+      const { scene } = useEditorStore.getState();
+      expect(scene.layers[0].data[5 * scene.width + 5]).toBe(7);
+    });
+
+    it('stampClipboard skips empty tiles', () => {
+      useEditorStore.getState().selectArea(0, 0, 1, 0);
+      useEditorStore.getState().copySelection();
+      const { setSelectedTile, paintTile } = useEditorStore.getState();
+      setSelectedTile(9);
+      paintTile(3, 3);
+      useEditorStore.getState().stampClipboard(3, 3);
+      const { scene } = useEditorStore.getState();
+      expect(scene.layers[0].data[3 * scene.width + 3]).toBe(9);
+    });
+
+    it('clearSelection resets both fields', () => {
+      useEditorStore.getState().selectArea(0, 0, 2, 2);
+      useEditorStore.getState().copySelection();
+      expect(useEditorStore.getState().selectionBounds).not.toBeNull();
+      expect(useEditorStore.getState().clipboard).not.toBeNull();
+      useEditorStore.getState().clearSelection();
+      expect(useEditorStore.getState().selectionBounds).toBeNull();
+      expect(useEditorStore.getState().clipboard).toBeNull();
     });
   });
 });

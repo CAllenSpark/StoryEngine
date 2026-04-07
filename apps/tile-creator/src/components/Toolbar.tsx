@@ -1,13 +1,21 @@
 import { useEditorStore } from '../store/editorStore.js';
 import type { Tool } from '../types/editor.js';
 
+const TOOL_LABELS: Record<Tool, string> = {
+  paint: 'Paint',
+  erase: 'Erase',
+  select: 'Select',
+};
+
 export function Toolbar() {
   const activeTool = useEditorStore((s) => s.activeTool);
   const zoom = useEditorStore((s) => s.zoom);
   const currentRotation = useEditorStore((s) => s.currentRotation);
+  const hasSelection = useEditorStore((s) => s.selectionBounds !== null || s.clipboard !== null);
   const setActiveTool = useEditorStore((s) => s.setActiveTool);
   const setZoom = useEditorStore((s) => s.setZoom);
   const setRotation = useEditorStore((s) => s.setRotation);
+  const clearSelection = useEditorStore((s) => s.clearSelection);
 
   return (
     <div
@@ -23,15 +31,20 @@ export function Toolbar() {
       <span style={{ fontSize: 14, fontWeight: 600, marginRight: 8 }}>
         Tile Creator
       </span>
-      {(['paint', 'erase'] as Tool[]).map((tool) => (
+      {(['paint', 'erase', 'select'] as Tool[]).map((tool) => (
         <button
           key={tool}
           className={activeTool === tool ? 'active' : ''}
           onClick={() => setActiveTool(tool)}
         >
-          {tool === 'paint' ? 'Paint' : 'Erase'}
+          {TOOL_LABELS[tool]}
         </button>
       ))}
+      {hasSelection && (
+        <button onClick={clearSelection} style={{ color: '#f38ba8' }}>
+          Clear
+        </button>
+      )}
       <span style={{ marginLeft: 8, fontSize: 12, color: '#6c7086' }}>|</span>
       <button onClick={() => setRotation((currentRotation + 1) % 4)}>
         Rotate: {currentRotation * 90}&deg;

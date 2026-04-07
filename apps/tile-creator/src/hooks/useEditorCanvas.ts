@@ -12,6 +12,8 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
   const isPaintingRef = useRef(false);
   const hoverRef = useRef<{ x: number; y: number } | null>(null);
   const rafRef = useRef<number>(0);
+  const selectionStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isDraggingSelectionRef = useRef(false);
 
   const scheduleRender = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
@@ -22,7 +24,7 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
       if (!ctx) return;
 
       const state = useEditorStore.getState();
-      const { scene, layerVisibility, zoom, tileset } = state;
+      const { scene, layerVisibility, zoom, tileset, selectionBounds, clipboard, activeTool } = state;
       const ts = scene.tileSize;
       const w = scene.width * ts * zoom;
       const h = scene.height * ts * zoom;
@@ -84,15 +86,54 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
         ctx.stroke();
       }
 
+      // Selection rectangle overlay
+      if (selectionBounds) {
+        const sx = selectionBounds.x1 * ts * zoom;
+        const sy = selectionBounds.y1 * ts * zoom;
+        const sw = (selectionBounds.x2 - selectionBounds.x1 + 1) * ts * zoom;
+        const sh = (selectionBounds.y2 - selectionBounds.y1 + 1) * ts * zoom;
+        ctx.strokeStyle = '#89b4fa';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(sx, sy, sw, sh);
+        ctx.setLineDash([]);
+      }
+
+      // Clipboard ghost preview at hover position
       const hover = hoverRef.current;
+      if (clipboard && activeTool === 'select' && hover && tileset) {
+        ctx.globalAlpha = 0.5;
+        for (let cy = 0; cy < clipboard.height; cy++) {
+          for (let cx = 0; cx < clipboard.width; cx++) {
+            const tileId = clipboard.tiles[cy * clipboard.width + cx];
+            if (tileId < 0) continue;
+            const destX = hover.x + cx;
+            const destY = hover.y + cy;
+            if (destX < 0 || destX >= scene.width || destY < 0 || destY >= scene.height) continue;
+            const px = destX * ts * zoom;
+            const py = destY * ts * zoom;
+            const sz = ts * zoom;
+            if (tileId < tileset.tileImages.length) {
+              const rotation = clipboard.transforms[cy * clipboard.width + cx] ?? 0;
+              if (rotation === 0) {
+                ctx.drawImage(tileset.tileImages[tileId], px, py, sz, sz);
+              } else {
+                ctx.save();
+                ctx.translate(px + sz / 2, py + sz / 2);
+                ctx.rotate((rotation * Math.PI) / 2);
+                ctx.drawImage(tileset.tileImages[tileId], -sz / 2, -sz / 2, sz, sz);
+                ctx.restore();
+              }
+            }
+          }
+        }
+        ctx.globalAlpha = 1.0;
+      }
+
+      // Hover highlight
       if (hover && hover.x >= 0 && hover.x < scene.width && hover.y >= 0 && hover.y < scene.height) {
         ctx.fillStyle = HOVER_COLOR;
-        ctx.fillRect(
-          hover.x * ts * zoom,
-          hover.y * ts * zoom,
-          ts * zoom,
-          ts * zoom,
-        );
+        ctx.fillRect(hover.x * ts * zoom, hover.y * ts * zoom, ts * zoom, ts * zoom);
       }
     });
   }, [canvasRef]);
@@ -124,7 +165,7 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
     (gx: number, gy: number) => {
       const { activeTool, paintTile, eraseTile } = useEditorStore.getState();
       if (activeTool === 'paint') paintTile(gx, gy);
-      else eraseTile(gx, gy);
+      else if (activeTool === 'erase') eraseTile(gx, gy);
     },
     [],
   );
@@ -135,26 +176,51 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
 
     const onMouseDown = (e: MouseEvent) => {
       if (e.button !== 0) return;
-      isPaintingRef.current = true;
       const pos = toGrid(e);
-      if (pos) applyTool(pos.x, pos.y);
+      if (!pos) return;
+      const { activeTool, clipboard } = useEditorStore.getState();
+
+      if (activeTool === 'select') {
+        if (clipboard) {
+          useEditorStore.getState().stampClipboard(pos.x, pos.y);
+        } else {
+          selectionStartRef.current = pos;
+          isDraggingSelectionRef.current = true;
+          useEditorStore.getState().selectArea(pos.x, pos.y, pos.x, pos.y);
+        }
+      } else {
+        isPaintingRef.current = true;
+        applyTool(pos.x, pos.y);
+      }
     };
 
     const onMouseMove = (e: MouseEvent) => {
       const pos = toGrid(e);
       hoverRef.current = pos;
-      if (isPaintingRef.current && pos) {
+      if (isDraggingSelectionRef.current && pos && selectionStartRef.current) {
+        useEditorStore.getState().selectArea(
+          selectionStartRef.current.x, selectionStartRef.current.y,
+          pos.x, pos.y,
+        );
+      } else if (isPaintingRef.current && pos) {
         applyTool(pos.x, pos.y);
       }
       scheduleRender();
     };
 
     const onMouseUp = () => {
+      if (isDraggingSelectionRef.current) {
+        isDraggingSelectionRef.current = false;
+        selectionStartRef.current = null;
+        useEditorStore.getState().copySelection();
+      }
       isPaintingRef.current = false;
     };
 
     const onMouseLeave = () => {
       isPaintingRef.current = false;
+      isDraggingSelectionRef.current = false;
+      selectionStartRef.current = null;
       hoverRef.current = null;
       scheduleRender();
     };

@@ -31,6 +31,15 @@ export function App() {
         if (tag === 'INPUT' || tag === 'TEXTAREA') return;
         const { currentRotation, setRotation } = useEditorStore.getState();
         setRotation((currentRotation + 1) % 4);
+      } else if (e.key === 'Escape') {
+        const { selectionBounds, clipboard } = useEditorStore.getState();
+        if (selectionBounds || clipboard) {
+          useEditorStore.getState().clearSelection();
+        }
+      } else if (e.key === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        useEditorStore.getState().setActiveTool('select');
       }
     },
     [undo, redo],
@@ -39,6 +48,7 @@ export function App() {
   useEffect(() => {
     useEditorStore.getState().restoreTileset();
     useEditorStore.getState().loadLibrary();
+    useEditorStore.getState().restoreCollection();
   }, []);
 
   useEffect(() => {

@@ -1,11 +1,25 @@
 import type { SceneJSON, SceneCollection, TilesetRef } from '@storyengine/shared';
 import type { StoredTileset } from '../lib/assetDb.js';
 
-export type Tool = 'paint' | 'erase';
+export type Tool = 'paint' | 'erase' | 'select';
 
 export interface ImportWarning {
   level: 'info' | 'warn';
   message: string;
+}
+
+export interface SelectionBounds {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+export interface Clipboard {
+  width: number;
+  height: number;
+  tiles: number[];
+  transforms: number[];
 }
 
 export interface TilesetState {
@@ -27,6 +41,8 @@ export interface EditorState {
   currentTilesetId: string | null;
   currentCollection: SceneCollection | null;
   currentSceneId: string | null;
+  selectionBounds: SelectionBounds | null;
+  clipboard: Clipboard | null;
 }
 
 export interface EditorActions {
@@ -57,6 +73,11 @@ export interface EditorActions {
   deleteScene: (sceneId: string) => void;
   saveCollectionToDb: () => Promise<void>;
   loadCollectionFromDb: (id: string) => Promise<void>;
+  restoreCollection: () => Promise<void>;
+  selectArea: (x1: number, y1: number, x2: number, y2: number) => void;
+  copySelection: () => void;
+  stampClipboard: (destX: number, destY: number) => void;
+  clearSelection: () => void;
 }
 
 export type EditorStore = EditorState & EditorActions;

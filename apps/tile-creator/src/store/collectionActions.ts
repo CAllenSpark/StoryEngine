@@ -121,6 +121,7 @@ export function createCollectionActions(set: Set, get: Get) {
         logger.info('Saved collection', { name: collection.name });
       } catch (err) {
         logger.warn('Failed to save collection', { error: String(err) });
+        throw err;
       }
     },
 
@@ -140,6 +141,27 @@ export function createCollectionActions(set: Set, get: Get) {
         logger.info('Loaded collection', { name: collection.name });
       } catch (err) {
         logger.warn('Failed to load collection', { error: String(err) });
+      }
+    },
+
+    async restoreCollection() {
+      try {
+        const { listCollections } = await import('../lib/assetDb.js');
+        const all = await listCollections();
+        if (all.length === 0) return;
+        const latest = all.reduce((a, b) => a.updatedAt > b.updatedAt ? a : b);
+        if (latest.scenes.length === 0) return;
+        const first = latest.scenes[0];
+        set({
+          currentCollection: latest,
+          currentSceneId: first.id,
+          scene: first.scene,
+          activeLayerIndex: 0,
+          layerVisibility: first.scene.layers.map(() => true),
+        } as Partial<EditorStore>);
+        logger.info('Restored collection from IndexedDB', { name: latest.name });
+      } catch (err) {
+        logger.warn('Failed to restore collection', { error: String(err) });
       }
     },
   };

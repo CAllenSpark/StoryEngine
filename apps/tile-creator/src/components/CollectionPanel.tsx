@@ -15,6 +15,7 @@ export function CollectionPanel() {
   const [editName, setEditName] = useState('');
   const [collName, setCollName] = useState('');
   const [editingCollName, setEditingCollName] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const handleCreate = useCallback(() => {
     const name = collName.trim() || 'Untitled Collection';
@@ -97,8 +98,25 @@ export function CollectionPanel() {
             {collection.name}
           </span>
         )}
-        <button onClick={() => saveCollectionToDb()} style={{ fontSize: 10, padding: '2px 6px' }}>
-          Save
+        <button
+          onClick={async () => {
+            setSaveStatus('saving');
+            try {
+              await saveCollectionToDb();
+              setSaveStatus('saved');
+              setTimeout(() => setSaveStatus('idle'), 1500);
+            } catch {
+              setSaveStatus('error');
+              setTimeout(() => setSaveStatus('idle'), 3000);
+            }
+          }}
+          disabled={saveStatus === 'saving'}
+          style={{
+            fontSize: 10, padding: '2px 6px',
+            color: saveStatus === 'saved' ? '#a6e3a1' : saveStatus === 'error' ? '#f38ba8' : undefined,
+          }}
+        >
+          {saveStatus === 'idle' ? 'Save' : saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Error'}
         </button>
       </div>
       {collection.scenes.map((entry) => (

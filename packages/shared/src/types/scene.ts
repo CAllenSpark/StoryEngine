@@ -20,6 +20,18 @@ export interface SceneJSON {
   tileset: TilesetRef;
 }
 
+/**
+ * A single scene within a collection.
+ *
+ * Planned extension fields (non-breaking, all optional):
+ *   worldPosition?: { gridX: number; gridY: number }
+ *   connections?: { direction: 'north'|'south'|'east'|'west'; targetSceneId: string }[]
+ *
+ * These allow scenes to be positioned on a world-map grid with directional
+ * connections. A scene card can be reused at multiple positions (e.g., a road
+ * tile repeated 4 times on the way to a castle). Implemented in a future
+ * "world map layout" tool.
+ */
 export interface SceneEntry {
   id: string;
   name: string;
