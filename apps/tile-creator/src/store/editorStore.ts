@@ -6,6 +6,7 @@ import type { EditorStore, TilesetState, Tool } from '../types/editor.js';
 import type { StoredTileset } from '../lib/assetDb.js';
 import { HISTORY_LIMIT } from './historyMiddleware.js';
 import { createCollectionActions } from './collectionActions.js';
+import { encodeTransform, decodeTransform } from '../lib/transformUtils.js';
 import { logger } from '../logger.js';
 
 async function restoreTilesetFromStored(
@@ -77,23 +78,26 @@ export const useEditorStore = create<EditorStore>()(
       currentSceneId: null,
       selectionBounds: null,
       clipboard: null,
+      currentFlipH: false,
+      currentFlipV: false,
+      prefabLibrary: [],
 
       paintTile(x: number, y: number) {
-        const { scene, activeLayerIndex, selectedTileId, tileset } = get();
+        const { scene, activeLayerIndex, selectedTileId, tileset, currentRotation, currentFlipH, currentFlipV } = get();
         if (selectedTileId < 0) return;
         if (tileset && selectedTileId >= tileset.tileImages.length) return;
         if (x < 0 || x >= scene.width || y < 0 || y >= scene.height) return;
         const idx = y * scene.width + x;
         const layer = scene.layers[activeLayerIndex];
-        if (layer.data[idx] === selectedTileId) return;
+        const newTransformVal = encodeTransform(currentRotation, currentFlipH, currentFlipV);
+        if (layer.data[idx] === selectedTileId && (layer.transforms?.[idx] ?? 0) === newTransformVal) return;
 
         const newData = [...layer.data];
         newData[idx] = selectedTileId;
-        const currentRotation = get().currentRotation;
         const newTransforms = layer.transforms
           ? [...layer.transforms]
           : new Array(scene.width * scene.height).fill(0);
-        newTransforms[idx] = currentRotation;
+        newTransforms[idx] = newTransformVal;
         const newLayer = { ...layer, data: newData, transforms: newTransforms };
         const newLayers = [...scene.layers];
         newLayers[activeLayerIndex] = newLayer;
@@ -213,6 +217,9 @@ export const useEditorStore = create<EditorStore>()(
         set({
           tileset,
           scene: { ...scene, tileset: tileset.ref },
+          selectedTileId: 0,
+          clipboard: null,
+          selectionBounds: null,
         });
       },
 
@@ -229,7 +236,35 @@ export const useEditorStore = create<EditorStore>()(
         const currentTransforms = layer.transforms
           ? [...layer.transforms]
           : new Array(scene.width * scene.height).fill(0);
-        currentTransforms[idx] = (currentTransforms[idx] + 1) % 4;
+        const decoded = decodeTransform(currentTransforms[idx]);
+        currentTransforms[idx] = encodeTransform((decoded.rotation + 1) % 4, decoded.flipH, decoded.flipV);
+        const newLayer = { ...layer, transforms: currentTransforms };
+        const newLayers = [...scene.layers];
+        newLayers[activeLayerIndex] = newLayer;
+        set({ scene: { ...scene, layers: newLayers } });
+      },
+
+      toggleFlipH() {
+        set({ currentFlipH: !get().currentFlipH });
+      },
+
+      toggleFlipV() {
+        set({ currentFlipV: !get().currentFlipV });
+      },
+
+      flipTileAt(x: number, y: number, axis: 'h' | 'v') {
+        const { scene, activeLayerIndex } = get();
+        if (x < 0 || x >= scene.width || y < 0 || y >= scene.height) return;
+        const idx = y * scene.width + x;
+        const layer = scene.layers[activeLayerIndex];
+        if (layer.data[idx] < 0) return;
+        const currentTransforms = layer.transforms
+          ? [...layer.transforms]
+          : new Array(scene.width * scene.height).fill(0);
+        const decoded = decodeTransform(currentTransforms[idx]);
+        if (axis === 'h') decoded.flipH = !decoded.flipH;
+        else decoded.flipV = !decoded.flipV;
+        currentTransforms[idx] = encodeTransform(decoded.rotation, decoded.flipH, decoded.flipV);
         const newLayer = { ...layer, transforms: currentTransforms };
         const newLayers = [...scene.layers];
         newLayers[activeLayerIndex] = newLayer;
@@ -379,6 +414,64 @@ export const useEditorStore = create<EditorStore>()(
 
       clearSelection() {
         set({ selectionBounds: null, clipboard: null });
+      },
+
+      async savePrefabFromClipboard(name: string) {
+        const { clipboard } = get();
+        if (!clipboard) return;
+        try {
+          const { savePrefab } = await import('../lib/assetDb.js');
+          const prefab = {
+            id: crypto.randomUUID(),
+            name,
+            width: clipboard.width,
+            height: clipboard.height,
+            tiles: clipboard.tiles,
+            transforms: clipboard.transforms,
+            createdAt: Date.now(),
+          };
+          await savePrefab(prefab);
+          await get().loadPrefabLibrary();
+          logger.info('Saved prefab', { name });
+        } catch (err) {
+          logger.warn('Failed to save prefab', { error: String(err) });
+        }
+      },
+
+      async loadPrefab(id: string) {
+        const { prefabLibrary } = get();
+        const prefab = prefabLibrary.find((p) => p.id === id);
+        if (!prefab) return;
+        set({
+          clipboard: {
+            width: prefab.width,
+            height: prefab.height,
+            tiles: prefab.tiles,
+            transforms: prefab.transforms,
+          },
+          activeTool: 'select',
+          selectionBounds: null,
+        });
+      },
+
+      async deletePrefab(id: string) {
+        try {
+          const { deletePrefabById } = await import('../lib/assetDb.js');
+          await deletePrefabById(id);
+          await get().loadPrefabLibrary();
+        } catch (err) {
+          logger.warn('Failed to delete prefab', { error: String(err) });
+        }
+      },
+
+      async loadPrefabLibrary() {
+        try {
+          const { listPrefabs } = await import('../lib/assetDb.js');
+          const prefabs = await listPrefabs();
+          set({ prefabLibrary: prefabs });
+        } catch (err) {
+          logger.warn('Failed to load prefab library', { error: String(err) });
+        }
       },
 
       ...createCollectionActions(set, get),

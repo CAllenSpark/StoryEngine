@@ -68,8 +68,10 @@ export function TilesetPanel() {
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!tileset || columns === 0) return;
       const rect = e.currentTarget.getBoundingClientRect();
-      const x = Math.floor((e.clientX - rect.left) / (tileSize * PALETTE_SCALE));
-      const y = Math.floor((e.clientY - rect.top) / (tileSize * PALETTE_SCALE));
+      const scaleX = e.currentTarget.width / rect.width;
+      const scaleY = e.currentTarget.height / rect.height;
+      const x = Math.floor(((e.clientX - rect.left) * scaleX) / (tileSize * PALETTE_SCALE));
+      const y = Math.floor(((e.clientY - rect.top) * scaleY) / (tileSize * PALETTE_SCALE));
       const id = y * columns + x;
       if (id >= 0 && id < tileCount) {
         setSelectedTile(id);
@@ -82,8 +84,10 @@ export function TilesetPanel() {
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (!tileset || columns === 0) { setHoveredTileId(-1); return; }
       const rect = e.currentTarget.getBoundingClientRect();
-      const x = Math.floor((e.clientX - rect.left) / (tileSize * PALETTE_SCALE));
-      const y = Math.floor((e.clientY - rect.top) / (tileSize * PALETTE_SCALE));
+      const scaleX = e.currentTarget.width / rect.width;
+      const scaleY = e.currentTarget.height / rect.height;
+      const x = Math.floor(((e.clientX - rect.left) * scaleX) / (tileSize * PALETTE_SCALE));
+      const y = Math.floor(((e.clientY - rect.top) * scaleY) / (tileSize * PALETTE_SCALE));
       const id = y * columns + x;
       setHoveredTileId(id >= 0 && id < tileCount ? id : -1);
     },

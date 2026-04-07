@@ -1,9 +1,11 @@
 import type { SceneCollection } from '@storyengine/shared';
+import type { Prefab } from '../types/editor.js';
 
 const DB_NAME = 'tile-creator-assets';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const STORE_TILESETS = 'tilesets';
 const STORE_COLLECTIONS = 'collections';
+const STORE_PREFABS = 'prefabs';
 
 export interface StoredTileset {
   id: string;
@@ -29,6 +31,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (oldVersion < 3 && !db.objectStoreNames.contains(STORE_COLLECTIONS)) {
         db.createObjectStore(STORE_COLLECTIONS, { keyPath: 'id' });
+      }
+      if (oldVersion < 4 && !db.objectStoreNames.contains(STORE_PREFABS)) {
+        db.createObjectStore(STORE_PREFABS, { keyPath: 'id' });
       }
       if (oldVersion === 1) {
         const store = req.transaction!.objectStore(STORE_TILESETS);
@@ -130,6 +135,36 @@ export async function deleteCollection(id: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_COLLECTIONS, 'readwrite');
     tx.objectStore(STORE_COLLECTIONS).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function savePrefab(prefab: Prefab): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_PREFABS, 'readwrite');
+    tx.objectStore(STORE_PREFABS).put(prefab);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function listPrefabs(): Promise<Prefab[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_PREFABS, 'readonly');
+    const req = tx.objectStore(STORE_PREFABS).getAll();
+    req.onsuccess = () => resolve(req.result ?? []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function deletePrefabById(id: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_PREFABS, 'readwrite');
+    tx.objectStore(STORE_PREFABS).delete(id);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });

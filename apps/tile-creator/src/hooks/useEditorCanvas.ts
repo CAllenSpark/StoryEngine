@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, type RefObject } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
+import { decodeTransform } from '../lib/transformUtils.js';
 
 const GRID_COLOR = '#45475a';
 const HOVER_COLOR = 'rgba(137, 180, 250, 0.3)';
@@ -49,15 +50,17 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
             const px = x * ts * zoom;
             const py = y * ts * zoom;
             const sz = ts * zoom;
-            const rotation = layer.transforms?.[dataIdx] ?? 0;
+            const rawTransform = layer.transforms?.[dataIdx] ?? 0;
+            const { rotation, flipH, flipV } = decodeTransform(rawTransform);
 
             if (tileset && tileId < tileset.tileImages.length) {
-              if (rotation === 0) {
+              if (rotation === 0 && !flipH && !flipV) {
                 ctx.drawImage(tileset.tileImages[tileId], px, py, sz, sz);
               } else {
                 ctx.save();
                 ctx.translate(px + sz / 2, py + sz / 2);
                 ctx.rotate((rotation * Math.PI) / 2);
+                ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
                 ctx.drawImage(tileset.tileImages[tileId], -sz / 2, -sz / 2, sz, sz);
                 ctx.restore();
               }
@@ -114,13 +117,15 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
             const py = destY * ts * zoom;
             const sz = ts * zoom;
             if (tileId < tileset.tileImages.length) {
-              const rotation = clipboard.transforms[cy * clipboard.width + cx] ?? 0;
-              if (rotation === 0) {
+              const rawT = clipboard.transforms[cy * clipboard.width + cx] ?? 0;
+              const { rotation: rot, flipH: fH, flipV: fV } = decodeTransform(rawT);
+              if (rot === 0 && !fH && !fV) {
                 ctx.drawImage(tileset.tileImages[tileId], px, py, sz, sz);
               } else {
                 ctx.save();
                 ctx.translate(px + sz / 2, py + sz / 2);
-                ctx.rotate((rotation * Math.PI) / 2);
+                ctx.rotate((rot * Math.PI) / 2);
+                ctx.scale(fH ? -1 : 1, fV ? -1 : 1);
                 ctx.drawImage(tileset.tileImages[tileId], -sz / 2, -sz / 2, sz, sz);
                 ctx.restore();
               }

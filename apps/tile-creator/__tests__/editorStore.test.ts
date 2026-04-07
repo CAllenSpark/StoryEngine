@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useEditorStore, createDefaultScene } from '../src/store/editorStore.js';
+import { encodeTransform, decodeTransform } from '../src/lib/transformUtils.js';
 
 function resetStore() {
   useEditorStore.setState({
@@ -11,12 +12,15 @@ function resetStore() {
     zoom: 2,
     tileset: null,
     currentRotation: 0,
+    currentFlipH: false,
+    currentFlipV: false,
     tilesetLibrary: [],
     currentTilesetId: null,
     currentCollection: null,
     currentSceneId: null,
     selectionBounds: null,
     clipboard: null,
+    prefabLibrary: [],
   });
   useEditorStore.temporal.getState().clear();
 }
@@ -332,6 +336,98 @@ describe('editorStore', () => {
       useEditorStore.getState().clearSelection();
       expect(useEditorStore.getState().selectionBounds).toBeNull();
       expect(useEditorStore.getState().clipboard).toBeNull();
+    });
+
+    it('stamp works across layers', () => {
+      const { setSelectedTile, paintTile, setActiveLayer, addLayer } = useEditorStore.getState();
+      setSelectedTile(5);
+      paintTile(0, 0);
+      useEditorStore.getState().selectArea(0, 0, 0, 0);
+      useEditorStore.getState().copySelection();
+      addLayer('target');
+      const layerCount = useEditorStore.getState().scene.layers.length;
+      setActiveLayer(layerCount - 1);
+      useEditorStore.getState().stampClipboard(3, 3);
+      const { scene } = useEditorStore.getState();
+      const targetLayer = scene.layers[layerCount - 1];
+      expect(targetLayer.data[3 * scene.width + 3]).toBe(5);
+      // Source layer unchanged at (3,3)
+      expect(scene.layers[0].data[3 * scene.width + 3]).toBe(-1);
+    });
+  });
+
+  describe('transformUtils', () => {
+    it('encodeTransform/decodeTransform roundtrip', () => {
+      const encoded = encodeTransform(2, true, false);
+      const decoded = decodeTransform(encoded);
+      expect(decoded).toEqual({ rotation: 2, flipH: true, flipV: false });
+    });
+
+    it('backward compatible with old 0-3 values', () => {
+      expect(decodeTransform(0)).toEqual({ rotation: 0, flipH: false, flipV: false });
+      expect(decodeTransform(1)).toEqual({ rotation: 1, flipH: false, flipV: false });
+      expect(decodeTransform(2)).toEqual({ rotation: 2, flipH: false, flipV: false });
+      expect(decodeTransform(3)).toEqual({ rotation: 3, flipH: false, flipV: false });
+    });
+
+    it('encodes all combinations', () => {
+      const encoded = encodeTransform(1, true, true);
+      expect(decodeTransform(encoded)).toEqual({ rotation: 1, flipH: true, flipV: true });
+    });
+  });
+
+  describe('flip', () => {
+    it('paintTile encodes flip state', () => {
+      const { setSelectedTile, paintTile } = useEditorStore.getState();
+      useEditorStore.setState({ currentFlipH: true, currentFlipV: false, currentRotation: 0 });
+      setSelectedTile(2);
+      paintTile(1, 1);
+      const layer = useEditorStore.getState().scene.layers[0];
+      const idx = 1 * 20 + 1;
+      const decoded = decodeTransform(layer.transforms![idx]);
+      expect(decoded.flipH).toBe(true);
+      expect(decoded.flipV).toBe(false);
+      expect(decoded.rotation).toBe(0);
+    });
+
+    it('toggleFlipH toggles state', () => {
+      expect(useEditorStore.getState().currentFlipH).toBe(false);
+      useEditorStore.getState().toggleFlipH();
+      expect(useEditorStore.getState().currentFlipH).toBe(true);
+      useEditorStore.getState().toggleFlipH();
+      expect(useEditorStore.getState().currentFlipH).toBe(false);
+    });
+
+    it('flipTileAt toggles flip on placed tile', () => {
+      const { setSelectedTile, paintTile } = useEditorStore.getState();
+      setSelectedTile(3);
+      paintTile(2, 2);
+      useEditorStore.getState().flipTileAt(2, 2, 'h');
+      const layer = useEditorStore.getState().scene.layers[0];
+      const idx = 2 * 20 + 2;
+      const decoded = decodeTransform(layer.transforms![idx]);
+      expect(decoded.flipH).toBe(true);
+      expect(decoded.flipV).toBe(false);
+    });
+
+    it('flipTileAt does nothing on empty tile', () => {
+      const sceneBefore = useEditorStore.getState().scene;
+      useEditorStore.getState().flipTileAt(0, 0, 'v');
+      expect(useEditorStore.getState().scene).toBe(sceneBefore);
+    });
+  });
+
+  describe('setTileset reset', () => {
+    it('resets selectedTileId and clipboard on tileset change', () => {
+      useEditorStore.setState({ selectedTileId: 50, clipboard: { width: 1, height: 1, tiles: [5], transforms: [0] } });
+      useEditorStore.getState().setTileset({
+        ref: { name: 'test', tileSize: 16, image: 'test.png', columns: 4 },
+        imageDataUrl: '',
+        tileImages: [],
+      });
+      expect(useEditorStore.getState().selectedTileId).toBe(0);
+      expect(useEditorStore.getState().clipboard).toBeNull();
+      expect(useEditorStore.getState().selectionBounds).toBeNull();
     });
   });
 });

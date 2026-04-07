@@ -11,10 +11,14 @@ export function Toolbar() {
   const activeTool = useEditorStore((s) => s.activeTool);
   const zoom = useEditorStore((s) => s.zoom);
   const currentRotation = useEditorStore((s) => s.currentRotation);
+  const currentFlipH = useEditorStore((s) => s.currentFlipH);
+  const currentFlipV = useEditorStore((s) => s.currentFlipV);
   const hasSelection = useEditorStore((s) => s.selectionBounds !== null || s.clipboard !== null);
   const setActiveTool = useEditorStore((s) => s.setActiveTool);
   const setZoom = useEditorStore((s) => s.setZoom);
   const setRotation = useEditorStore((s) => s.setRotation);
+  const toggleFlipH = useEditorStore((s) => s.toggleFlipH);
+  const toggleFlipV = useEditorStore((s) => s.toggleFlipV);
   const clearSelection = useEditorStore((s) => s.clearSelection);
 
   return (
@@ -48,6 +52,12 @@ export function Toolbar() {
       <span style={{ marginLeft: 8, fontSize: 12, color: '#6c7086' }}>|</span>
       <button onClick={() => setRotation((currentRotation + 1) % 4)}>
         Rotate: {currentRotation * 90}&deg;
+      </button>
+      <button className={currentFlipH ? 'active' : ''} onClick={toggleFlipH}>
+        Flip H
+      </button>
+      <button className={currentFlipV ? 'active' : ''} onClick={toggleFlipV}>
+        Flip V
       </button>
       <span style={{ marginLeft: 'auto', fontSize: 12 }}>Zoom:</span>
       <button onClick={() => setZoom(zoom - 1)}>-</button>

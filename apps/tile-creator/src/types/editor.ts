@@ -22,6 +22,16 @@ export interface Clipboard {
   transforms: number[];
 }
 
+export interface Prefab {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  tiles: number[];
+  transforms: number[];
+  createdAt: number;
+}
+
 export interface TilesetState {
   ref: TilesetRef;
   imageDataUrl: string;
@@ -43,6 +53,9 @@ export interface EditorState {
   currentSceneId: string | null;
   selectionBounds: SelectionBounds | null;
   clipboard: Clipboard | null;
+  currentFlipH: boolean;
+  currentFlipV: boolean;
+  prefabLibrary: Prefab[];
 }
 
 export interface EditorActions {
@@ -78,6 +91,13 @@ export interface EditorActions {
   copySelection: () => void;
   stampClipboard: (destX: number, destY: number) => void;
   clearSelection: () => void;
+  toggleFlipH: () => void;
+  toggleFlipV: () => void;
+  flipTileAt: (x: number, y: number, axis: 'h' | 'v') => void;
+  savePrefabFromClipboard: (name: string) => Promise<void>;
+  loadPrefab: (id: string) => Promise<void>;
+  deletePrefab: (id: string) => Promise<void>;
+  loadPrefabLibrary: () => Promise<void>;
 }
 
 export type EditorStore = EditorState & EditorActions;

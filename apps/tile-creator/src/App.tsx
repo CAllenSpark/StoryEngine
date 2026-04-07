@@ -7,6 +7,7 @@ import { EditorCanvas } from './components/EditorCanvas.js';
 import { LayerPanel } from './components/LayerPanel.js';
 import { TilesetLibrary } from './components/TilesetLibrary.js';
 import { CollectionPanel } from './components/CollectionPanel.js';
+import { PrefabPanel } from './components/PrefabPanel.js';
 import { ExportBar } from './components/ExportBar.js';
 import './App.css';
 
@@ -40,6 +41,14 @@ export function App() {
         const tag = (e.target as HTMLElement)?.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA') return;
         useEditorStore.getState().setActiveTool('select');
+      } else if (e.key === 'h' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        useEditorStore.getState().toggleFlipH();
+      } else if (e.key === 'v' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        useEditorStore.getState().toggleFlipV();
       }
     },
     [undo, redo],
@@ -49,6 +58,7 @@ export function App() {
     useEditorStore.getState().restoreTileset();
     useEditorStore.getState().loadLibrary();
     useEditorStore.getState().restoreCollection();
+    useEditorStore.getState().loadPrefabLibrary();
   }, []);
 
   useEffect(() => {
@@ -65,6 +75,7 @@ export function App() {
         <div className="right-panel">
           <LayerPanel />
           <CollectionPanel />
+          <PrefabPanel />
           <TilesetLibrary />
         </div>
       </div>
