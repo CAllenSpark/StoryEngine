@@ -1,7 +1,9 @@
 import { useSceneIO } from '../hooks/useSceneIO.js';
+import { useEditorStore } from '../store/editorStore.js';
 
 export function ExportBar() {
-  const { exportScene, importScene, importError } = useSceneIO();
+  const { exportScene, importScene, exportCollection, importCollection, importError } = useSceneIO();
+  const hasCollection = useEditorStore((s) => s.currentCollection !== null);
 
   return (
     <div
@@ -14,8 +16,11 @@ export function ExportBar() {
         background: '#181825',
       }}
     >
-      <button onClick={exportScene}>Export JSON</button>
-      <button onClick={importScene}>Import JSON</button>
+      <button onClick={exportScene}>Export Scene</button>
+      <button onClick={importScene}>Import Scene</button>
+      <span style={{ color: '#45475a' }}>|</span>
+      <button onClick={exportCollection} disabled={!hasCollection}>Export Collection</button>
+      <button onClick={importCollection}>Import Collection</button>
       {importError && (
         <span style={{ color: '#f38ba8', fontSize: 11 }}>{importError}</span>
       )}

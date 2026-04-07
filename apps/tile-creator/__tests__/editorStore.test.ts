@@ -13,6 +13,8 @@ function resetStore() {
     currentRotation: 0,
     tilesetLibrary: [],
     currentTilesetId: null,
+    currentCollection: null,
+    currentSceneId: null,
   });
   useEditorStore.temporal.getState().clear();
 }

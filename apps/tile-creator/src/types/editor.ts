@@ -1,4 +1,4 @@
-import type { SceneJSON, TilesetRef } from '@storyengine/shared';
+import type { SceneJSON, SceneCollection, TilesetRef } from '@storyengine/shared';
 import type { StoredTileset } from '../lib/assetDb.js';
 
 export type Tool = 'paint' | 'erase';
@@ -25,6 +25,8 @@ export interface EditorState {
   currentRotation: number;
   tilesetLibrary: StoredTileset[];
   currentTilesetId: string | null;
+  currentCollection: SceneCollection | null;
+  currentSceneId: string | null;
 }
 
 export interface EditorActions {
@@ -48,6 +50,13 @@ export interface EditorActions {
   switchTileset: (id: string) => Promise<void>;
   deleteTilesetFromLibrary: (id: string) => Promise<void>;
   saveTilesetToLibrary: () => Promise<void>;
+  createCollection: (name: string) => void;
+  addSceneToCollection: (name: string) => void;
+  switchScene: (sceneId: string) => void;
+  renameScene: (sceneId: string, name: string) => void;
+  deleteScene: (sceneId: string) => void;
+  saveCollectionToDb: () => Promise<void>;
+  loadCollectionFromDb: (id: string) => Promise<void>;
 }
 
 export type EditorStore = EditorState & EditorActions;

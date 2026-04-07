@@ -5,6 +5,7 @@ import type { SceneJSON, TileLayer } from '@storyengine/shared';
 import type { EditorStore, TilesetState, Tool } from '../types/editor.js';
 import type { StoredTileset } from '../lib/assetDb.js';
 import { HISTORY_LIMIT } from './historyMiddleware.js';
+import { createCollectionActions } from './collectionActions.js';
 import { logger } from '../logger.js';
 
 async function restoreTilesetFromStored(
@@ -72,6 +73,8 @@ export const useEditorStore = create<EditorStore>()(
       currentRotation: 0,
       tilesetLibrary: [],
       currentTilesetId: null,
+      currentCollection: null,
+      currentSceneId: null,
 
       paintTile(x: number, y: number) {
         const { scene, activeLayerIndex, selectedTileId, tileset } = get();
@@ -316,6 +319,8 @@ export const useEditorStore = create<EditorStore>()(
           logger.warn('Failed to save tileset to library', { error: String(err) });
         }
       },
+
+      ...createCollectionActions(set, get),
     }),
     {
       limit: HISTORY_LIMIT,

@@ -1,6 +1,9 @@
+import type { SceneCollection } from '@storyengine/shared';
+
 const DB_NAME = 'tile-creator-assets';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_TILESETS = 'tilesets';
+const STORE_COLLECTIONS = 'collections';
 
 export interface StoredTileset {
   id: string;
@@ -23,6 +26,9 @@ function openDb(): Promise<IDBDatabase> {
       const oldVersion = (event as IDBVersionChangeEvent).oldVersion;
       if (oldVersion < 1) {
         db.createObjectStore(STORE_TILESETS, { keyPath: 'id' });
+      }
+      if (oldVersion < 3 && !db.objectStoreNames.contains(STORE_COLLECTIONS)) {
+        db.createObjectStore(STORE_COLLECTIONS, { keyPath: 'id' });
       }
       if (oldVersion === 1) {
         const store = req.transaction!.objectStore(STORE_TILESETS);
@@ -84,6 +90,46 @@ export async function deleteTilesetById(id: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_TILESETS, 'readwrite');
     tx.objectStore(STORE_TILESETS).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function saveCollection(collection: SceneCollection): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_COLLECTIONS, 'readwrite');
+    tx.objectStore(STORE_COLLECTIONS).put(collection);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function loadCollection(id: string): Promise<SceneCollection | null> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_COLLECTIONS, 'readonly');
+    const req = tx.objectStore(STORE_COLLECTIONS).get(id);
+    req.onsuccess = () => resolve(req.result ?? null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function listCollections(): Promise<SceneCollection[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_COLLECTIONS, 'readonly');
+    const req = tx.objectStore(STORE_COLLECTIONS).getAll();
+    req.onsuccess = () => resolve(req.result ?? []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function deleteCollection(id: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_COLLECTIONS, 'readwrite');
+    tx.objectStore(STORE_COLLECTIONS).delete(id);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });

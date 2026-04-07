@@ -6,6 +6,7 @@ import { TilesetPanel } from './components/TilesetPanel.js';
 import { EditorCanvas } from './components/EditorCanvas.js';
 import { LayerPanel } from './components/LayerPanel.js';
 import { TilesetLibrary } from './components/TilesetLibrary.js';
+import { CollectionPanel } from './components/CollectionPanel.js';
 import { ExportBar } from './components/ExportBar.js';
 import './App.css';
 
@@ -53,6 +54,7 @@ export function App() {
         <EditorCanvas />
         <div className="right-panel">
           <LayerPanel />
+          <CollectionPanel />
           <TilesetLibrary />
         </div>
       </div>
