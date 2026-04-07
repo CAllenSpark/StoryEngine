@@ -1,5 +1,4 @@
 import { useEffect, useRef, useCallback, type RefObject } from 'react';
-import { TILE_SIZE } from '@storyengine/shared';
 import { useEditorStore } from '../store/editorStore.js';
 
 const GRID_COLOR = '#45475a';
@@ -24,8 +23,9 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
 
       const state = useEditorStore.getState();
       const { scene, layerVisibility, zoom, tileset } = state;
-      const w = scene.width * TILE_SIZE * zoom;
-      const h = scene.height * TILE_SIZE * zoom;
+      const ts = scene.tileSize;
+      const w = scene.width * ts * zoom;
+      const h = scene.height * ts * zoom;
 
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width = w;
@@ -44,9 +44,9 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
             const dataIdx = y * scene.width + x;
             const tileId = layer.data[dataIdx];
             if (tileId < 0) continue;
-            const px = x * TILE_SIZE * zoom;
-            const py = y * TILE_SIZE * zoom;
-            const sz = TILE_SIZE * zoom;
+            const px = x * ts * zoom;
+            const py = y * ts * zoom;
+            const sz = ts * zoom;
             const rotation = layer.transforms?.[dataIdx] ?? 0;
 
             if (tileset && tileId < tileset.tileImages.length) {
@@ -70,14 +70,14 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
       ctx.strokeStyle = GRID_COLOR;
       ctx.lineWidth = 1;
       for (let x = 0; x <= scene.width; x++) {
-        const px = x * TILE_SIZE * zoom;
+        const px = x * ts * zoom;
         ctx.beginPath();
         ctx.moveTo(px + 0.5, 0);
         ctx.lineTo(px + 0.5, h);
         ctx.stroke();
       }
       for (let y = 0; y <= scene.height; y++) {
-        const py = y * TILE_SIZE * zoom;
+        const py = y * ts * zoom;
         ctx.beginPath();
         ctx.moveTo(0, py + 0.5);
         ctx.lineTo(w, py + 0.5);
@@ -88,10 +88,10 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
       if (hover && hover.x >= 0 && hover.x < scene.width && hover.y >= 0 && hover.y < scene.height) {
         ctx.fillStyle = HOVER_COLOR;
         ctx.fillRect(
-          hover.x * TILE_SIZE * zoom,
-          hover.y * TILE_SIZE * zoom,
-          TILE_SIZE * zoom,
-          TILE_SIZE * zoom,
+          hover.x * ts * zoom,
+          hover.y * ts * zoom,
+          ts * zoom,
+          ts * zoom,
         );
       }
     });
@@ -112,8 +112,9 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
       if (!canvas) return null;
       const rect = canvas.getBoundingClientRect();
       const zoom = useEditorStore.getState().zoom;
-      const x = Math.floor((e.clientX - rect.left) / (TILE_SIZE * zoom));
-      const y = Math.floor((e.clientY - rect.top) / (TILE_SIZE * zoom));
+      const ts = useEditorStore.getState().scene.tileSize;
+      const x = Math.floor((e.clientX - rect.left) / (ts * zoom));
+      const y = Math.floor((e.clientY - rect.top) / (ts * zoom));
       return { x, y };
     },
     [canvasRef],
