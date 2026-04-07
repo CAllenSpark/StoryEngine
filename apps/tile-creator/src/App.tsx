@@ -5,7 +5,7 @@ import { Toolbar } from './components/Toolbar.js';
 import { TilesetPanel } from './components/TilesetPanel.js';
 import { EditorCanvas } from './components/EditorCanvas.js';
 import { LayerPanel } from './components/LayerPanel.js';
-import { PreviewPane } from './components/PreviewPane.js';
+import { TilesetLibrary } from './components/TilesetLibrary.js';
 import { ExportBar } from './components/ExportBar.js';
 import './App.css';
 
@@ -37,6 +37,7 @@ export function App() {
 
   useEffect(() => {
     useEditorStore.getState().restoreTileset();
+    useEditorStore.getState().loadLibrary();
   }, []);
 
   useEffect(() => {
@@ -52,7 +53,7 @@ export function App() {
         <EditorCanvas />
         <div className="right-panel">
           <LayerPanel />
-          <PreviewPane />
+          <TilesetLibrary />
         </div>
       </div>
       <ExportBar />

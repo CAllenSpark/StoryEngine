@@ -3,8 +3,39 @@ import { temporal } from 'zundo';
 import { TILE_SIZE, TILEMAP_COLS, TILEMAP_ROWS } from '@storyengine/shared';
 import type { SceneJSON, TileLayer } from '@storyengine/shared';
 import type { EditorStore, TilesetState, Tool } from '../types/editor.js';
+import type { StoredTileset } from '../lib/assetDb.js';
 import { HISTORY_LIMIT } from './historyMiddleware.js';
 import { logger } from '../logger.js';
+
+async function restoreTilesetFromStored(
+  stored: StoredTileset,
+): Promise<TilesetState> {
+  const img = new Image();
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error('Failed to load stored tileset'));
+    img.src = stored.dataUrl;
+  });
+
+  const columns = stored.columns;
+  const rows = Math.floor(img.height / stored.tileSize);
+  const tileImages: ImageBitmap[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < columns; c++) {
+      const bmp = await createImageBitmap(
+        img, c * stored.tileSize, r * stored.tileSize, stored.tileSize, stored.tileSize,
+      );
+      tileImages.push(bmp);
+    }
+  }
+
+  const name = stored.name || stored.filename.replace(/\.[^.]+$/, '');
+  return {
+    ref: { name, tileSize: stored.tileSize, image: stored.filename, columns },
+    imageDataUrl: stored.dataUrl,
+    tileImages,
+  };
+}
 
 function createEmptyLayer(name: string): TileLayer {
   return {
@@ -39,6 +70,8 @@ export const useEditorStore = create<EditorStore>()(
       zoom: 2,
       tileset: null,
       currentRotation: 0,
+      tilesetLibrary: [],
+      currentTilesetId: null,
 
       paintTile(x: number, y: number) {
         const { scene, activeLayerIndex, selectedTileId, tileset } = get();
@@ -208,43 +241,79 @@ export const useEditorStore = create<EditorStore>()(
 
       async restoreTileset() {
         try {
-          const { loadTileset } = await import('../lib/assetDb.js');
-          const stored = await loadTileset();
-          if (!stored) return;
-
-          const img = new Image();
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = () => reject(new Error('Failed to load stored tileset'));
-            img.src = stored.dataUrl;
-          });
-
-          const columns = stored.columns;
-          const rows = Math.floor(img.height / stored.tileSize);
-          const tileImages: ImageBitmap[] = [];
-          for (let r = 0; r < rows; r++) {
-            for (let c = 0; c < columns; c++) {
-              const bmp = await createImageBitmap(
-                img,
-                c * stored.tileSize,
-                r * stored.tileSize,
-                stored.tileSize,
-                stored.tileSize,
-              );
-              tileImages.push(bmp);
-            }
-          }
-
-          const name = stored.filename.replace(/\.[^.]+$/, '');
-          get().setTileset({
-            ref: { name, tileSize: stored.tileSize, image: stored.filename, columns },
-            imageDataUrl: stored.dataUrl,
-            tileImages,
-          });
-
-          logger.info('Tileset restored from IndexedDB', { name, tileCount: tileImages.length });
+          const { listAllTilesets } = await import('../lib/assetDb.js');
+          const all = await listAllTilesets();
+          set({ tilesetLibrary: all });
+          if (all.length === 0) return;
+          const latest = all.reduce((a, b) => a.storedAt > b.storedAt ? a : b);
+          const tilesetState = await restoreTilesetFromStored(latest);
+          get().setTileset(tilesetState);
+          set({ currentTilesetId: latest.id });
+          logger.info('Tileset restored from IndexedDB', { name: latest.name, tileCount: tilesetState.tileImages.length });
         } catch (err) {
           logger.warn('Failed to restore tileset from IndexedDB', { error: String(err) });
+        }
+      },
+
+      async loadLibrary() {
+        try {
+          const { listAllTilesets } = await import('../lib/assetDb.js');
+          set({ tilesetLibrary: await listAllTilesets() });
+        } catch (err) {
+          logger.warn('Failed to load tileset library', { error: String(err) });
+        }
+      },
+
+      async switchTileset(id: string) {
+        try {
+          const { loadTilesetById } = await import('../lib/assetDb.js');
+          const stored = await loadTilesetById(id);
+          if (!stored) return;
+          const tilesetState = await restoreTilesetFromStored(stored);
+          get().setTileset(tilesetState);
+          set({ currentTilesetId: id });
+          logger.info('Switched tileset', { name: stored.name });
+        } catch (err) {
+          logger.warn('Failed to switch tileset', { error: String(err) });
+        }
+      },
+
+      async deleteTilesetFromLibrary(id: string) {
+        try {
+          const { deleteTilesetById, listAllTilesets } = await import('../lib/assetDb.js');
+          await deleteTilesetById(id);
+          const all = await listAllTilesets();
+          const updates: Partial<EditorStore> = { tilesetLibrary: all };
+          if (get().currentTilesetId === id) {
+            updates.tileset = null;
+            updates.currentTilesetId = null;
+          }
+          set(updates as EditorStore);
+          logger.info('Deleted tileset from library', { id });
+        } catch (err) {
+          logger.warn('Failed to delete tileset', { error: String(err) });
+        }
+      },
+
+      async saveTilesetToLibrary() {
+        const { tileset } = get();
+        if (!tileset) return;
+        try {
+          const { saveTilesetToLibrary: saveToLib, listAllTilesets } = await import('../lib/assetDb.js');
+          const id = get().currentTilesetId ?? crypto.randomUUID();
+          await saveToLib({
+            id,
+            name: tileset.ref.name,
+            filename: tileset.ref.image,
+            dataUrl: tileset.imageDataUrl,
+            tileSize: tileset.ref.tileSize,
+            columns: tileset.ref.columns,
+            storedAt: Date.now(),
+          });
+          set({ currentTilesetId: id, tilesetLibrary: await listAllTilesets() });
+          logger.info('Saved tileset to library', { name: tileset.ref.name });
+        } catch (err) {
+          logger.warn('Failed to save tileset to library', { error: String(err) });
         }
       },
     }),

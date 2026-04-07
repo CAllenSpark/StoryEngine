@@ -1,9 +1,10 @@
 const DB_NAME = 'tile-creator-assets';
-const DB_VERSION = 1;
-const STORE_NAME = 'tilesets';
+const DB_VERSION = 2;
+const STORE_TILESETS = 'tilesets';
 
 export interface StoredTileset {
-  id: 'current';
+  id: string;
+  name: string;
   filename: string;
   dataUrl: string;
   tileSize: number;
@@ -17,10 +18,26 @@ function openDb(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (event) => {
       const db = req.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      const oldVersion = (event as IDBVersionChangeEvent).oldVersion;
+      if (oldVersion < 1) {
+        db.createObjectStore(STORE_TILESETS, { keyPath: 'id' });
+      }
+      if (oldVersion === 1) {
+        const store = req.transaction!.objectStore(STORE_TILESETS);
+        const getReq = store.get('current');
+        getReq.onsuccess = () => {
+          if (getReq.result) {
+            store.delete('current');
+            const migrated = {
+              ...getReq.result,
+              id: crypto.randomUUID(),
+              name: (getReq.result.filename ?? 'tileset').replace(/\.[^.]+$/, ''),
+            };
+            store.put(migrated);
+          }
+        };
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -32,31 +49,41 @@ function openDb(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
-export async function saveTileset(tileset: StoredTileset): Promise<void> {
+export async function saveTilesetToLibrary(tileset: StoredTileset): Promise<void> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).put(tileset);
+    const tx = db.transaction(STORE_TILESETS, 'readwrite');
+    tx.objectStore(STORE_TILESETS).put(tileset);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
 }
 
-export async function loadTileset(): Promise<StoredTileset | null> {
+export async function loadTilesetById(id: string): Promise<StoredTileset | null> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const req = tx.objectStore(STORE_NAME).get('current');
+    const tx = db.transaction(STORE_TILESETS, 'readonly');
+    const req = tx.objectStore(STORE_TILESETS).get(id);
     req.onsuccess = () => resolve(req.result ?? null);
     req.onerror = () => reject(req.error);
   });
 }
 
-export async function clearTileset(): Promise<void> {
+export async function listAllTilesets(): Promise<StoredTileset[]> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).delete('current');
+    const tx = db.transaction(STORE_TILESETS, 'readonly');
+    const req = tx.objectStore(STORE_TILESETS).getAll();
+    req.onsuccess = () => resolve(req.result ?? []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function deleteTilesetById(id: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_TILESETS, 'readwrite');
+    tx.objectStore(STORE_TILESETS).delete(id);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });

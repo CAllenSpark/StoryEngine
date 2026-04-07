@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { TILE_SIZE } from '@storyengine/shared';
 import { useEditorStore } from '../store/editorStore.js';
-import { saveTileset } from '../lib/assetDb.js';
+import { saveTilesetToLibrary } from '../lib/assetDb.js';
 import { logger } from '../logger.js';
 import { useImportDialog } from './useImportDialog.js';
 import type { ImportWarning } from '../types/editor.js';
@@ -88,13 +88,18 @@ export function useTilesetImport() {
           tileImages,
         });
 
-        saveTileset({
-          id: 'current',
+        const tilesetId = crypto.randomUUID();
+        saveTilesetToLibrary({
+          id: tilesetId,
+          name,
           filename: dialogState.fileName,
           dataUrl: pngDataUrl,
           tileSize,
           columns,
           storedAt: Date.now(),
+        }).then(() => {
+          useEditorStore.getState().loadLibrary();
+          useEditorStore.setState({ currentTilesetId: tilesetId });
         }).catch((err) => {
           logger.warn('Failed to persist tileset to IndexedDB', { error: String(err) });
         });

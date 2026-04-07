@@ -1,4 +1,5 @@
 import type { SceneJSON, TilesetRef } from '@storyengine/shared';
+import type { StoredTileset } from '../lib/assetDb.js';
 
 export type Tool = 'paint' | 'erase';
 
@@ -22,6 +23,8 @@ export interface EditorState {
   zoom: number;
   tileset: TilesetState | null;
   currentRotation: number;
+  tilesetLibrary: StoredTileset[];
+  currentTilesetId: string | null;
 }
 
 export interface EditorActions {
@@ -41,6 +44,10 @@ export interface EditorActions {
   restoreTileset: () => Promise<void>;
   setRotation: (rotation: number) => void;
   rotateTileAt: (x: number, y: number) => void;
+  loadLibrary: () => Promise<void>;
+  switchTileset: (id: string) => Promise<void>;
+  deleteTilesetFromLibrary: (id: string) => Promise<void>;
+  saveTilesetToLibrary: () => Promise<void>;
 }
 
 export type EditorStore = EditorState & EditorActions;
