@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
+import { AnimationDialog } from './AnimationDialog.js';
 import type { Tool } from '../types/editor.js';
 
 const TOOL_LABELS: Record<Tool, string> = {
@@ -25,6 +27,7 @@ export function Toolbar() {
   const toggleFlipV = useEditorStore((s) => s.toggleFlipV);
   const clearSelection = useEditorStore((s) => s.clearSelection);
   const setColor = useEditorStore((s) => s.setColor);
+  const [showAnimDialog, setShowAnimDialog] = useState(false);
 
   const paintDisabled = activeTool === 'paint' && (selectedTileId < 0 || !tileset);
 
@@ -68,6 +71,12 @@ export function Toolbar() {
         </button>
       )}
       <span style={{ marginLeft: 8, fontSize: 12, color: '#6c7086' }}>|</span>
+      <button
+        disabled={selectedTileId < 0 || !tileset}
+        onClick={() => setShowAnimDialog(true)}
+      >
+        Animate
+      </button>
       <button onClick={() => setRotation((currentRotation + 1) % 4)}>
         Rotate: {currentRotation * 90}&deg;
       </button>
@@ -83,6 +92,12 @@ export function Toolbar() {
         {zoom}x
       </span>
       <button onClick={() => setZoom(zoom + 1)}>+</button>
+      {showAnimDialog && selectedTileId >= 0 && (
+        <AnimationDialog
+          baseTileId={selectedTileId}
+          onClose={() => setShowAnimDialog(false)}
+        />
+      )}
     </div>
   );
 }

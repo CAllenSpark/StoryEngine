@@ -1,11 +1,12 @@
 import type { SceneCollection } from '@storyengine/shared';
-import type { Prefab } from '../types/editor.js';
+import type { Prefab, StoredAnimation } from '../types/editor.js';
 
 const DB_NAME = 'tile-creator-assets';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const STORE_TILESETS = 'tilesets';
 const STORE_COLLECTIONS = 'collections';
 const STORE_PREFABS = 'prefabs';
+const STORE_ANIMATIONS = 'animations';
 
 export interface StoredTileset {
   id: string;
@@ -34,6 +35,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (oldVersion < 4 && !db.objectStoreNames.contains(STORE_PREFABS)) {
         db.createObjectStore(STORE_PREFABS, { keyPath: 'id' });
+      }
+      if (oldVersion < 5 && !db.objectStoreNames.contains(STORE_ANIMATIONS)) {
+        db.createObjectStore(STORE_ANIMATIONS, { keyPath: 'id' });
       }
       if (oldVersion === 1) {
         const store = req.transaction!.objectStore(STORE_TILESETS);
@@ -165,6 +169,36 @@ export async function deletePrefabById(id: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_PREFABS, 'readwrite');
     tx.objectStore(STORE_PREFABS).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function saveAnimation(anim: StoredAnimation): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_ANIMATIONS, 'readwrite');
+    tx.objectStore(STORE_ANIMATIONS).put(anim);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function listAnimations(): Promise<StoredAnimation[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_ANIMATIONS, 'readonly');
+    const req = tx.objectStore(STORE_ANIMATIONS).getAll();
+    req.onsuccess = () => resolve(req.result ?? []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function deleteAnimationById(id: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_ANIMATIONS, 'readwrite');
+    tx.objectStore(STORE_ANIMATIONS).delete(id);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });

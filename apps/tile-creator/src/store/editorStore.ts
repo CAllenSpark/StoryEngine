@@ -84,6 +84,7 @@ export const useEditorStore = create<EditorStore>()(
       currentColor: '#a6e3a1',
       colorTileMap: {},
       animClock: 0,
+      animationLibrary: [],
 
       paintTile(x: number, y: number) {
         const { scene, activeLayerIndex, selectedTileId, tileset, currentRotation, currentFlipH, currentFlipV } = get();
@@ -481,10 +482,10 @@ export const useEditorStore = create<EditorStore>()(
         set({ currentColor: color });
       },
 
-      setTileAnimation(baseTileId: number, frames: number[], speed: number) {
+      setTileAnimation(baseTileId: number, phases: import('@storyengine/shared').AnimationPhase[]) {
         const { tileset, scene } = get();
         if (!tileset) return;
-        const animations = { ...tileset.ref.animations, [String(baseTileId)]: { frames, speed } };
+        const animations = { ...tileset.ref.animations, [String(baseTileId)]: { phases } };
         const ref = { ...tileset.ref, animations };
         set({
           tileset: { ...tileset, ref },
@@ -506,6 +507,58 @@ export const useEditorStore = create<EditorStore>()(
 
       tickAnimation() {
         set((s) => ({ animClock: s.animClock + 250 }));
+      },
+
+      async saveAnimationToLibrary(name: string, phases: import('@storyengine/shared').AnimationPhase[]) {
+        try {
+          const { saveAnimation } = await import('../lib/assetDb.js');
+          const stored = {
+            id: crypto.randomUUID(),
+            name,
+            phases,
+            createdAt: Date.now(),
+          };
+          await saveAnimation(stored);
+          const { listAnimations } = await import('../lib/assetDb.js');
+          const lib = await listAnimations();
+          set({ animationLibrary: lib });
+        } catch (err) {
+          logger.warn('Failed to save animation to library', { error: String(err) });
+        }
+      },
+
+      async loadAnimationLibrary() {
+        try {
+          const { listAnimations } = await import('../lib/assetDb.js');
+          const lib = await listAnimations();
+          set({ animationLibrary: lib });
+        } catch (err) {
+          logger.warn('Failed to load animation library', { error: String(err) });
+        }
+      },
+
+      async deleteAnimationFromLibrary(id: string) {
+        try {
+          const { deleteAnimationById } = await import('../lib/assetDb.js');
+          await deleteAnimationById(id);
+          const { listAnimations } = await import('../lib/assetDb.js');
+          const lib = await listAnimations();
+          set({ animationLibrary: lib });
+        } catch (err) {
+          logger.warn('Failed to delete animation from library', { error: String(err) });
+        }
+      },
+
+      applyLibraryAnimation(animId: string, baseTileId: number) {
+        const { animationLibrary, tileset, scene } = get();
+        const stored = animationLibrary.find((a) => a.id === animId);
+        if (!stored || !tileset) return;
+        const animations = { ...tileset.ref.animations, [String(baseTileId)]: { phases: stored.phases } };
+        const ref = { ...tileset.ref, animations };
+        set({
+          tileset: { ...tileset, ref },
+          scene: { ...scene, tileset: ref },
+        });
       },
 
       async paintColor(x: number, y: number) {

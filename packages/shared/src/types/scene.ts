@@ -1,6 +1,21 @@
-export interface TileAnimation {
+export interface AnimationPhase {
   frames: number[];
   speed: number;
+  loops?: number;
+}
+
+export interface TileAnimation {
+  phases: AnimationPhase[];
+}
+
+/** Migrate old { frames, speed } format to phased format. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function migrateTileAnimation(raw: any): TileAnimation {
+  if (raw && Array.isArray(raw.phases)) return raw as TileAnimation;
+  if (raw && Array.isArray(raw.frames) && typeof raw.speed === 'number') {
+    return { phases: [{ frames: raw.frames, speed: raw.speed }] };
+  }
+  return { phases: [] };
 }
 
 export interface TilesetRef {

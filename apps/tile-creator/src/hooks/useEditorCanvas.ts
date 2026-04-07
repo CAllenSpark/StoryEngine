@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, type RefObject } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
 import { decodeTransform } from '../lib/transformUtils.js';
 import type { TileAnimation } from '@storyengine/shared';
+import { migrateTileAnimation } from '@storyengine/shared';
 
 function resolveAnimatedTile(
   tileId: number,
@@ -9,13 +10,39 @@ function resolveAnimatedTile(
   clock: number,
 ): number {
   if (!animations) return tileId;
-  const anim = animations[String(tileId)];
-  if (!anim || anim.frames.length < 2) return tileId;
-  const frameDuration = 1000 / anim.speed;
-  const totalDuration = frameDuration * anim.frames.length;
-  const t = clock % totalDuration;
-  const frameIdx = Math.floor(t / frameDuration);
-  return anim.frames[frameIdx] ?? tileId;
+  const raw = animations[String(tileId)];
+  if (!raw) return tileId;
+  const anim = migrateTileAnimation(raw);
+  if (anim.phases.length === 0) return tileId;
+
+  // Walk through phases, consuming clock time
+  let remaining = clock;
+  for (let pi = 0; pi < anim.phases.length; pi++) {
+    const phase = anim.phases[pi];
+    if (phase.frames.length === 0) continue;
+    const frameDuration = 1000 / phase.speed;
+    const cycleDuration = frameDuration * phase.frames.length;
+
+    if (phase.loops !== undefined) {
+      const phaseTotalTime = cycleDuration * phase.loops;
+      if (remaining < phaseTotalTime) {
+        const t = remaining % cycleDuration;
+        return phase.frames[Math.floor(t / frameDuration)] ?? tileId;
+      }
+      remaining -= phaseTotalTime;
+    } else {
+      // Infinite loop — absorbs all remaining time
+      const t = remaining % cycleDuration;
+      return phase.frames[Math.floor(t / frameDuration)] ?? tileId;
+    }
+  }
+
+  // All finite phases exhausted — hold last frame of last phase
+  const lastPhase = anim.phases[anim.phases.length - 1];
+  if (lastPhase && lastPhase.frames.length > 0) {
+    return lastPhase.frames[lastPhase.frames.length - 1] ?? tileId;
+  }
+  return tileId;
 }
 
 const GRID_COLOR = '#45475a';

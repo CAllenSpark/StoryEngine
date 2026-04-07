@@ -77,6 +77,7 @@ export function TilesetPanel() {
       const id = y * columns + x;
       if (id >= 0 && id < tileCount) {
         setSelectedTile(id);
+        useEditorStore.getState().setActiveTool('paint');
       }
     },
     [tileset, tileSize, columns, tileCount, setSelectedTile],

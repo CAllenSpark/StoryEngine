@@ -24,6 +24,7 @@ function resetStore() {
     currentColor: '#a6e3a1',
     colorTileMap: {},
     animClock: 0,
+    animationLibrary: [],
   });
   useEditorStore.temporal.getState().clear();
 }
@@ -455,31 +456,45 @@ describe('editorStore', () => {
       });
     });
 
-    it('setTileAnimation adds animation to tileset ref', () => {
-      useEditorStore.getState().setTileAnimation(0, [0, 1, 2, 1], 4);
+    it('setTileAnimation adds phased animation to tileset ref', () => {
+      useEditorStore.getState().setTileAnimation(0, [{ frames: [0, 1, 2, 1], speed: 4 }]);
       const anim = useEditorStore.getState().tileset?.ref.animations?.['0'];
-      expect(anim).toEqual({ frames: [0, 1, 2, 1], speed: 4 });
+      expect(anim).toEqual({ phases: [{ frames: [0, 1, 2, 1], speed: 4 }] });
     });
 
     it('setTileAnimation persists to scene.tileset', () => {
-      useEditorStore.getState().setTileAnimation(3, [3, 4], 8);
+      useEditorStore.getState().setTileAnimation(3, [{ frames: [3, 4], speed: 8 }]);
       const sceneAnim = useEditorStore.getState().scene.tileset.animations?.['3'];
-      expect(sceneAnim).toEqual({ frames: [3, 4], speed: 8 });
+      expect(sceneAnim).toEqual({ phases: [{ frames: [3, 4], speed: 8 }] });
+    });
+
+    it('setTileAnimation supports multiple phases with loops', () => {
+      useEditorStore.getState().setTileAnimation(0, [
+        { frames: [0, 1, 2], speed: 4, loops: 5 },
+        { frames: [3, 4], speed: 2, loops: 3 },
+        { frames: [5], speed: 1 },
+      ]);
+      const anim = useEditorStore.getState().tileset?.ref.animations?.['0'];
+      expect(anim?.phases).toHaveLength(3);
+      expect(anim?.phases[0].loops).toBe(5);
+      expect(anim?.phases[2].loops).toBeUndefined();
     });
 
     it('removeTileAnimation removes animation', () => {
-      useEditorStore.getState().setTileAnimation(0, [0, 1], 4);
+      useEditorStore.getState().setTileAnimation(0, [{ frames: [0, 1], speed: 4 }]);
       expect(useEditorStore.getState().tileset?.ref.animations?.['0']).toBeDefined();
       useEditorStore.getState().removeTileAnimation(0);
       expect(useEditorStore.getState().tileset?.ref.animations).toBeUndefined();
     });
 
     it('removeTileAnimation keeps other animations', () => {
-      useEditorStore.getState().setTileAnimation(0, [0, 1], 4);
-      useEditorStore.getState().setTileAnimation(2, [2, 3], 6);
+      useEditorStore.getState().setTileAnimation(0, [{ frames: [0, 1], speed: 4 }]);
+      useEditorStore.getState().setTileAnimation(2, [{ frames: [2, 3], speed: 6 }]);
       useEditorStore.getState().removeTileAnimation(0);
       expect(useEditorStore.getState().tileset?.ref.animations?.['0']).toBeUndefined();
-      expect(useEditorStore.getState().tileset?.ref.animations?.['2']).toEqual({ frames: [2, 3], speed: 6 });
+      expect(useEditorStore.getState().tileset?.ref.animations?.['2']).toEqual({
+        phases: [{ frames: [2, 3], speed: 6 }],
+      });
     });
 
     it('tickAnimation increments animClock', () => {

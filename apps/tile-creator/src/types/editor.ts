@@ -1,4 +1,4 @@
-import type { SceneJSON, SceneCollection, TilesetRef } from '@storyengine/shared';
+import type { SceneJSON, SceneCollection, TilesetRef, AnimationPhase } from '@storyengine/shared';
 import type { StoredTileset } from '../lib/assetDb.js';
 
 export type Tool = 'paint' | 'erase' | 'select' | 'colorPaint';
@@ -20,6 +20,13 @@ export interface Clipboard {
   height: number;
   tiles: number[];
   transforms: number[];
+}
+
+export interface StoredAnimation {
+  id: string;
+  name: string;
+  phases: AnimationPhase[];
+  createdAt: number;
 }
 
 export interface Prefab {
@@ -59,6 +66,7 @@ export interface EditorState {
   currentColor: string;
   colorTileMap: Record<string, number>;
   animClock: number;
+  animationLibrary: StoredAnimation[];
 }
 
 export interface EditorActions {
@@ -104,9 +112,13 @@ export interface EditorActions {
   setColor: (color: string) => void;
   paintColor: (x: number, y: number) => Promise<void>;
   autoTileImage: (image: HTMLImageElement, tileSize: number) => Promise<void>;
-  setTileAnimation: (baseTileId: number, frames: number[], speed: number) => void;
+  setTileAnimation: (baseTileId: number, phases: AnimationPhase[]) => void;
   removeTileAnimation: (baseTileId: number) => void;
   tickAnimation: () => void;
+  saveAnimationToLibrary: (name: string, phases: AnimationPhase[]) => Promise<void>;
+  loadAnimationLibrary: () => Promise<void>;
+  deleteAnimationFromLibrary: (id: string) => Promise<void>;
+  applyLibraryAnimation: (animId: string, baseTileId: number) => void;
 }
 
 export type EditorStore = EditorState & EditorActions;
