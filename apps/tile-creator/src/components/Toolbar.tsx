@@ -4,8 +4,10 @@ import type { Tool } from '../types/editor.js';
 export function Toolbar() {
   const activeTool = useEditorStore((s) => s.activeTool);
   const zoom = useEditorStore((s) => s.zoom);
+  const currentRotation = useEditorStore((s) => s.currentRotation);
   const setActiveTool = useEditorStore((s) => s.setActiveTool);
   const setZoom = useEditorStore((s) => s.setZoom);
+  const setRotation = useEditorStore((s) => s.setRotation);
 
   return (
     <div
@@ -30,6 +32,10 @@ export function Toolbar() {
           {tool === 'paint' ? 'Paint' : 'Erase'}
         </button>
       ))}
+      <span style={{ marginLeft: 8, fontSize: 12, color: '#6c7086' }}>|</span>
+      <button onClick={() => setRotation((currentRotation + 1) % 4)}>
+        Rotate: {currentRotation * 90}&deg;
+      </button>
       <span style={{ marginLeft: 'auto', fontSize: 12 }}>Zoom:</span>
       <button onClick={() => setZoom(zoom - 1)}>-</button>
       <span style={{ fontSize: 12, minWidth: 24, textAlign: 'center' }}>

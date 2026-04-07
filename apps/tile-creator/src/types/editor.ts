@@ -21,6 +21,7 @@ export interface EditorState {
   layerVisibility: boolean[];
   zoom: number;
   tileset: TilesetState | null;
+  currentRotation: number;
 }
 
 export interface EditorActions {
@@ -38,6 +39,8 @@ export interface EditorActions {
   setTileset: (tileset: TilesetState) => void;
   loadScene: (scene: SceneJSON) => void;
   restoreTileset: () => Promise<void>;
+  setRotation: (rotation: number) => void;
+  rotateTileAt: (x: number, y: number) => void;
 }
 
 export type EditorStore = EditorState & EditorActions;

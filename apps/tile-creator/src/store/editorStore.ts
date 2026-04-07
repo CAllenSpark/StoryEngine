@@ -38,10 +38,12 @@ export const useEditorStore = create<EditorStore>()(
       layerVisibility: [true, true, true],
       zoom: 2,
       tileset: null,
+      currentRotation: 0,
 
       paintTile(x: number, y: number) {
-        const { scene, activeLayerIndex, selectedTileId } = get();
+        const { scene, activeLayerIndex, selectedTileId, tileset } = get();
         if (selectedTileId < 0) return;
+        if (tileset && selectedTileId >= tileset.tileImages.length) return;
         if (x < 0 || x >= scene.width || y < 0 || y >= scene.height) return;
         const idx = y * scene.width + x;
         const layer = scene.layers[activeLayerIndex];
@@ -49,7 +51,12 @@ export const useEditorStore = create<EditorStore>()(
 
         const newData = [...layer.data];
         newData[idx] = selectedTileId;
-        const newLayer = { ...layer, data: newData };
+        const currentRotation = get().currentRotation;
+        const newTransforms = layer.transforms
+          ? [...layer.transforms]
+          : new Array(scene.width * scene.height).fill(0);
+        newTransforms[idx] = currentRotation;
+        const newLayer = { ...layer, data: newData, transforms: newTransforms };
         const newLayers = [...scene.layers];
         newLayers[activeLayerIndex] = newLayer;
         set({ scene: { ...scene, layers: newLayers } });
@@ -64,7 +71,11 @@ export const useEditorStore = create<EditorStore>()(
 
         const newData = [...layer.data];
         newData[idx] = -1;
-        const newLayer = { ...layer, data: newData };
+        const newTransforms = layer.transforms
+          ? [...layer.transforms]
+          : new Array(scene.width * scene.height).fill(0);
+        newTransforms[idx] = 0;
+        const newLayer = { ...layer, data: newData, transforms: newTransforms };
         const newLayers = [...scene.layers];
         newLayers[activeLayerIndex] = newLayer;
         set({ scene: { ...scene, layers: newLayers } });
@@ -100,7 +111,7 @@ export const useEditorStore = create<EditorStore>()(
       },
 
       moveLayer(from: number, to: number) {
-        const { scene, layerVisibility } = get();
+        const { scene, layerVisibility, activeLayerIndex } = get();
         if (from === to) return;
         if (from < 0 || from >= scene.layers.length) return;
         if (to < 0 || to >= scene.layers.length) return;
@@ -113,9 +124,15 @@ export const useEditorStore = create<EditorStore>()(
         const [movedVis] = newVisibility.splice(from, 1);
         newVisibility.splice(to, 0, movedVis);
 
+        let newActive = activeLayerIndex;
+        if (activeLayerIndex === from) newActive = to;
+        else if (from < to && activeLayerIndex > from && activeLayerIndex <= to) newActive--;
+        else if (from > to && activeLayerIndex < from && activeLayerIndex >= to) newActive++;
+
         set({
           scene: { ...scene, layers: newLayers },
           layerVisibility: newVisibility,
+          activeLayerIndex: newActive,
         });
       },
 
@@ -159,6 +176,26 @@ export const useEditorStore = create<EditorStore>()(
           tileset,
           scene: { ...scene, tileset: tileset.ref },
         });
+      },
+
+      setRotation(rotation: number) {
+        set({ currentRotation: ((rotation % 4) + 4) % 4 });
+      },
+
+      rotateTileAt(x: number, y: number) {
+        const { scene, activeLayerIndex } = get();
+        if (x < 0 || x >= scene.width || y < 0 || y >= scene.height) return;
+        const idx = y * scene.width + x;
+        const layer = scene.layers[activeLayerIndex];
+        if (layer.data[idx] < 0) return;
+        const currentTransforms = layer.transforms
+          ? [...layer.transforms]
+          : new Array(scene.width * scene.height).fill(0);
+        currentTransforms[idx] = (currentTransforms[idx] + 1) % 4;
+        const newLayer = { ...layer, transforms: currentTransforms };
+        const newLayers = [...scene.layers];
+        newLayers[activeLayerIndex] = newLayer;
+        set({ scene: { ...scene, layers: newLayers } });
       },
 
       loadScene(scene: SceneJSON) {

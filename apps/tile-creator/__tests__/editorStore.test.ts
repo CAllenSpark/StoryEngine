@@ -10,6 +10,7 @@ function resetStore() {
     layerVisibility: [true, true, true],
     zoom: 2,
     tileset: null,
+    currentRotation: 0,
   });
   useEditorStore.temporal.getState().clear();
 }
@@ -121,6 +122,32 @@ describe('editorStore', () => {
       useEditorStore.getState().toggleLayerVisibility(1);
       expect(useEditorStore.getState().layerVisibility[1]).toBe(true);
     });
+
+    it('tracks activeLayerIndex when moving the active layer down', () => {
+      useEditorStore.getState().setActiveLayer(0);
+      useEditorStore.getState().moveLayer(0, 2);
+      expect(useEditorStore.getState().activeLayerIndex).toBe(2);
+      expect(useEditorStore.getState().scene.layers[2].name).toBe('background');
+    });
+
+    it('tracks activeLayerIndex when moving the active layer up', () => {
+      useEditorStore.getState().setActiveLayer(2);
+      useEditorStore.getState().moveLayer(2, 0);
+      expect(useEditorStore.getState().activeLayerIndex).toBe(0);
+      expect(useEditorStore.getState().scene.layers[0].name).toBe('foreground');
+    });
+
+    it('adjusts activeLayerIndex when layer below active moves above', () => {
+      useEditorStore.getState().setActiveLayer(1);
+      useEditorStore.getState().moveLayer(0, 2);
+      expect(useEditorStore.getState().activeLayerIndex).toBe(0);
+    });
+
+    it('adjusts activeLayerIndex when layer above active moves below', () => {
+      useEditorStore.getState().setActiveLayer(1);
+      useEditorStore.getState().moveLayer(2, 0);
+      expect(useEditorStore.getState().activeLayerIndex).toBe(2);
+    });
   });
 
   describe('undo/redo', () => {
@@ -195,6 +222,50 @@ describe('editorStore', () => {
       expect(useEditorStore.getState().zoom).toBe(1);
       useEditorStore.getState().setZoom(10);
       expect(useEditorStore.getState().zoom).toBe(8);
+    });
+  });
+
+  describe('tile rotation', () => {
+    it('paintTile writes currentRotation to transforms', () => {
+      const { setSelectedTile, setRotation, paintTile } = useEditorStore.getState();
+      setSelectedTile(1);
+      setRotation(2);
+      paintTile(3, 2);
+      const layer = useEditorStore.getState().scene.layers[0];
+      const idx = 2 * 20 + 3;
+      expect(layer.transforms?.[idx]).toBe(2);
+    });
+
+    it('eraseTile resets transform to 0', () => {
+      const { setSelectedTile, setRotation, paintTile, eraseTile } = useEditorStore.getState();
+      setSelectedTile(1);
+      setRotation(3);
+      paintTile(0, 0);
+      eraseTile(0, 0);
+      const layer = useEditorStore.getState().scene.layers[0];
+      expect(layer.transforms?.[0]).toBe(0);
+    });
+
+    it('rotateTileAt cycles 0 -> 1 -> 2 -> 3 -> 0', () => {
+      const { setSelectedTile, paintTile, rotateTileAt } = useEditorStore.getState();
+      setSelectedTile(1);
+      paintTile(0, 0);
+      for (let expected = 1; expected <= 4; expected++) {
+        rotateTileAt(0, 0);
+        const layer = useEditorStore.getState().scene.layers[0];
+        expect(layer.transforms?.[0]).toBe(expected % 4);
+      }
+    });
+
+    it('setRotation wraps negative values', () => {
+      useEditorStore.getState().setRotation(-1);
+      expect(useEditorStore.getState().currentRotation).toBe(3);
+    });
+
+    it('rotateTileAt does nothing on empty tile', () => {
+      const sceneBefore = useEditorStore.getState().scene;
+      useEditorStore.getState().rotateTileAt(0, 0);
+      expect(useEditorStore.getState().scene).toBe(sceneBefore);
     });
   });
 });

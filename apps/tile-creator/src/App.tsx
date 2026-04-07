@@ -25,6 +25,11 @@ export function App() {
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
         e.preventDefault();
         redo();
+      } else if (e.key === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        const { currentRotation, setRotation } = useEditorStore.getState();
+        setRotation((currentRotation + 1) % 4);
       }
     },
     [undo, redo],

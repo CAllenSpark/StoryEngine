@@ -8,6 +8,7 @@ export interface TilesetRef {
 export interface TileLayer {
   name: string;
   data: number[];
+  transforms?: number[];
 }
 
 export interface SceneJSON {

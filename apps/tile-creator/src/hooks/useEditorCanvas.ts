@@ -41,14 +41,24 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
         const layer = scene.layers[li];
         for (let y = 0; y < scene.height; y++) {
           for (let x = 0; x < scene.width; x++) {
-            const tileId = layer.data[y * scene.width + x];
+            const dataIdx = y * scene.width + x;
+            const tileId = layer.data[dataIdx];
             if (tileId < 0) continue;
             const px = x * TILE_SIZE * zoom;
             const py = y * TILE_SIZE * zoom;
             const sz = TILE_SIZE * zoom;
+            const rotation = layer.transforms?.[dataIdx] ?? 0;
 
             if (tileset && tileId < tileset.tileImages.length) {
-              ctx.drawImage(tileset.tileImages[tileId], px, py, sz, sz);
+              if (rotation === 0) {
+                ctx.drawImage(tileset.tileImages[tileId], px, py, sz, sz);
+              } else {
+                ctx.save();
+                ctx.translate(px + sz / 2, py + sz / 2);
+                ctx.rotate((rotation * Math.PI) / 2);
+                ctx.drawImage(tileset.tileImages[tileId], -sz / 2, -sz / 2, sz, sz);
+                ctx.restore();
+              }
             } else {
               ctx.fillStyle = PLACEHOLDER_COLORS[tileId % PLACEHOLDER_COLORS.length];
               ctx.fillRect(px, py, sz, sz);
