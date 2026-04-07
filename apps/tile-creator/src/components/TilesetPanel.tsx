@@ -11,7 +11,7 @@ export function TilesetPanel() {
   const selectedTileId = useEditorStore((s) => s.selectedTileId);
   const setSelectedTile = useEditorStore((s) => s.setSelectedTile);
   const {
-    importTileset, commitImport, isLoading, error, warnings,
+    importTileset, commitImport, commitMerge, isLoading, error, warnings,
     dialogState, closeDialog, setSelectedTileSize,
   } = useTilesetImport();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -49,6 +49,26 @@ export function TilesetPanel() {
           tileSize * PALETTE_SCALE,
           tileSize * PALETTE_SCALE,
         );
+      }
+    }
+
+    // Draw animation badges
+    const anims = tileset.ref.animations;
+    if (anims) {
+      for (const key of Object.keys(anims)) {
+        const id = Number(key);
+        if (id < 0 || id >= tileCount) continue;
+        const ac = id % columns;
+        const ar = Math.floor(id / columns);
+        const apx = ac * tileSize * PALETTE_SCALE;
+        const apy = ar * tileSize * PALETTE_SCALE;
+        ctx.fillStyle = 'rgba(137, 180, 250, 0.8)';
+        ctx.beginPath();
+        ctx.moveTo(apx + 2, apy + 2);
+        ctx.lineTo(apx + 10, apy + 7);
+        ctx.lineTo(apx + 2, apy + 12);
+        ctx.closePath();
+        ctx.fill();
       }
     }
 
@@ -113,31 +133,6 @@ export function TilesetPanel() {
     },
     [tileset, tileSize, columns, tileCount],
   );
-
-  // Draw animated tile badges on the palette
-  const animations = tileset?.ref.animations;
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !tileset || !animations) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    for (const key of Object.keys(animations)) {
-      const id = Number(key);
-      if (id < 0 || id >= tileCount) continue;
-      const col = id % columns;
-      const row = Math.floor(id / columns);
-      const px = col * tileSize * PALETTE_SCALE;
-      const py = row * tileSize * PALETTE_SCALE;
-      // Small play triangle badge
-      ctx.fillStyle = 'rgba(137, 180, 250, 0.8)';
-      ctx.beginPath();
-      ctx.moveTo(px + 2, py + 2);
-      ctx.lineTo(px + 10, py + 7);
-      ctx.lineTo(px + 2, py + 12);
-      ctx.closePath();
-      ctx.fill();
-    }
-  }, [tileset, tileSize, tileCount, columns, animations, selectedTileId]);
 
   useEffect(() => {
     const canvas = previewCanvasRef.current;
@@ -210,8 +205,10 @@ export function TilesetPanel() {
           fileName={dialogState.fileName}
           detectedSizes={dialogState.detectedSizes}
           selectedTileSize={dialogState.selectedTileSize}
+          hasExistingTileset={!!tileset}
           onSelectTileSize={setSelectedTileSize}
           onConfirm={() => commitImport(dialogState.selectedTileSize)}
+          onMerge={() => commitMerge(dialogState.selectedTileSize)}
           onAutoTile={async () => {
             if (!dialogState.imageDataUrl) return;
             try {

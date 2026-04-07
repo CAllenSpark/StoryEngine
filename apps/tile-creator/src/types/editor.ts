@@ -83,12 +83,14 @@ export interface EditorActions {
   toggleLayerVisibility: (index: number) => void;
   setZoom: (zoom: number) => void;
   setTileset: (tileset: TilesetState) => void;
+  mergeTileset: (incoming: TilesetState) => void;
   loadScene: (scene: SceneJSON) => void;
   restoreTileset: () => Promise<void>;
   setRotation: (rotation: number) => void;
   rotateTileAt: (x: number, y: number) => void;
   loadLibrary: () => Promise<void>;
   switchTileset: (id: string) => Promise<void>;
+  mergeFromLibrary: (id: string) => Promise<void>;
   deleteTilesetFromLibrary: (id: string) => Promise<void>;
   saveTilesetToLibrary: () => Promise<void>;
   createCollection: (name: string) => void;

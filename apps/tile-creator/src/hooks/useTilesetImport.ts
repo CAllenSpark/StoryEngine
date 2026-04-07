@@ -117,8 +117,60 @@ export function useTilesetImport() {
     [dialogState, setTileset, closeDialog],
   );
 
+  const commitMerge = useCallback(
+    async (tileSize: number) => {
+      if (!dialogState.imageDataUrl) return;
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const image = await loadImage(dialogState.imageDataUrl);
+        const columns = Math.floor(image.width / tileSize);
+        const rows = Math.floor(image.height / tileSize);
+
+        if (columns === 0 || rows === 0) {
+          throw new Error(
+            `Image too small for ${tileSize}px tiles: ${image.width}x${image.height}`,
+          );
+        }
+
+        const isPng = dialogState.fileType === 'image/png';
+        const pngDataUrl = isPng ? dialogState.imageDataUrl : ensurePngDataUrl(image);
+
+        const tileImages: ImageBitmap[] = [];
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < columns; c++) {
+            const bmp = await createImageBitmap(
+              image, c * tileSize, r * tileSize, tileSize, tileSize,
+            );
+            tileImages.push(bmp);
+          }
+        }
+
+        const name = dialogState.fileName.replace(/\.[^.]+$/, '');
+
+        useEditorStore.getState().mergeTileset({
+          ref: { name, tileSize, image: dialogState.fileName, columns },
+          imageDataUrl: pngDataUrl,
+          tileImages,
+        });
+
+        logger.info('Tileset merged', { name, columns, rows, tileSize, tileCount: tileImages.length });
+        closeDialog();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Failed to merge tileset';
+        setError(msg);
+        logger.error('Tileset merge failed', { error: msg });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [dialogState, closeDialog],
+  );
+
   return {
-    importTileset, commitImport, isLoading, error, warnings,
+    importTileset, commitImport, commitMerge, isLoading, error, warnings,
     dialogState, closeDialog, setSelectedTileSize,
   };
 }

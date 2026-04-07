@@ -249,6 +249,36 @@ export const useEditorStore = create<EditorStore>()(
         });
       },
 
+      mergeTileset(incoming: TilesetState) {
+        const { tileset: existing, scene } = get();
+        if (!existing) {
+          // No existing tileset — just set it
+          get().setTileset(incoming);
+          return;
+        }
+        // Append incoming tiles to existing
+        const mergedTileImages = [...existing.tileImages, ...incoming.tileImages];
+        const columns = Math.max(existing.ref.columns, incoming.ref.columns, 8);
+        const mergedRef = {
+          ...existing.ref,
+          columns,
+          name: existing.ref.name,
+        };
+        const merged: TilesetState = {
+          ref: mergedRef,
+          imageDataUrl: existing.imageDataUrl,
+          tileImages: mergedTileImages,
+        };
+        set({
+          tileset: merged,
+          scene: { ...scene, tileset: mergedRef },
+          selectedTileId: existing.tileImages.length, // Select first new tile
+          clipboard: null,
+          selectionBounds: null,
+          colorTileMap: {},
+        });
+      },
+
       setRotation(rotation: number) {
         set({ currentRotation: ((rotation % 4) + 4) % 4 });
       },
@@ -341,6 +371,19 @@ export const useEditorStore = create<EditorStore>()(
           logger.info('Switched tileset', { name: stored.name });
         } catch (err) {
           logger.warn('Failed to switch tileset', { error: String(err) });
+        }
+      },
+
+      async mergeFromLibrary(id: string) {
+        try {
+          const { loadTilesetById } = await import('../lib/assetDb.js');
+          const stored = await loadTilesetById(id);
+          if (!stored) return;
+          const tilesetState = await restoreTilesetFromStored(stored);
+          get().mergeTileset(tilesetState);
+          logger.info('Merged tileset from library', { name: stored.name });
+        } catch (err) {
+          logger.warn('Failed to merge tileset from library', { error: String(err) });
         }
       },
 

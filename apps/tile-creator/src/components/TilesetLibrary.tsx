@@ -6,6 +6,7 @@ export function TilesetLibrary() {
   const library = useEditorStore((s) => s.tilesetLibrary);
   const currentTilesetId = useEditorStore((s) => s.currentTilesetId);
   const switchTileset = useEditorStore((s) => s.switchTileset);
+  const mergeFromLibrary = useEditorStore((s) => s.mergeFromLibrary);
   const deleteTilesetFromLibrary = useEditorStore((s) => s.deleteTilesetFromLibrary);
   const saveTilesetToLibrary = useEditorStore((s) => s.saveTilesetToLibrary);
   const tileset = useEditorStore((s) => s.tileset);
@@ -100,6 +101,16 @@ export function TilesetLibrary() {
           />
         </form>
       ) : (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            mergeFromLibrary(ts.id);
+          }}
+          style={{ width: 18, height: 18, padding: 0, fontSize: 9, flexShrink: 0 }}
+          title="Merge into current tileset"
+        >
+          +
+        </button>
         <button
           onClick={(e) => {
             e.stopPropagation();

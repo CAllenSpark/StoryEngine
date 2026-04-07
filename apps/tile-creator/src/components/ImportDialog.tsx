@@ -7,8 +7,10 @@ interface ImportDialogProps {
   fileName: string;
   detectedSizes: number[];
   selectedTileSize: number;
+  hasExistingTileset: boolean;
   onSelectTileSize: (size: number) => void;
   onConfirm: () => void;
+  onMerge: () => void;
   onAutoTile: () => void;
   onCancel: () => void;
 }
@@ -19,7 +21,8 @@ export function ImportDialog(props: ImportDialogProps) {
   const {
     imageDataUrl, imageWidth, imageHeight, fileName,
     detectedSizes, selectedTileSize,
-    onSelectTileSize, onConfirm, onAutoTile, onCancel,
+    onSelectTileSize, onConfirm, onMerge, onAutoTile, onCancel,
+    hasExistingTileset,
   } = props;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -135,13 +138,18 @@ export function ImportDialog(props: ImportDialogProps) {
           </span>
         )}
 
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <button onClick={onCancel}>Cancel</button>
           <button onClick={onAutoTile} disabled={tileCount === 0}>
-            Auto-Tile (deduplicate)
+            Auto-Tile
           </button>
+          {hasExistingTileset && (
+            <button onClick={onMerge} disabled={tileCount === 0}>
+              Merge (+{tileCount})
+            </button>
+          )}
           <button className="active" onClick={onConfirm} disabled={tileCount === 0}>
-            Confirm ({tileCount} tiles)
+            {hasExistingTileset ? 'Replace' : 'Confirm'} ({tileCount})
           </button>
         </div>
       </div>
