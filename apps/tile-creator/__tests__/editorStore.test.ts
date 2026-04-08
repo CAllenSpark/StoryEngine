@@ -26,6 +26,9 @@ function resetStore() {
     animClock: 0,
     animationLibrary: [],
     editingGroupAnimationId: null,
+    editorMode: 'art',
+    activeGameTool: 'collision',
+    showCollisionOverlay: false,
   });
   useEditorStore.temporal.getState().clear();
 }
@@ -586,6 +589,70 @@ describe('editorStore', () => {
       const group = useEditorStore.getState().scene.groupAnimations![0];
       expect(group.phases[0].speed).toBe(8);
       expect(group.phases[0].frames).toHaveLength(2);
+    });
+  });
+
+  describe('game mode', () => {
+    it('setEditorMode switches mode and enables collision overlay', () => {
+      useEditorStore.getState().setEditorMode('game');
+      expect(useEditorStore.getState().editorMode).toBe('game');
+      expect(useEditorStore.getState().showCollisionOverlay).toBe(true);
+    });
+
+    it('paintCollision sets and unsets collision data', () => {
+      useEditorStore.getState().paintCollision(0, 0, true);
+      expect(useEditorStore.getState().scene.collisionLayer?.[0]).toBe(1);
+      useEditorStore.getState().paintCollision(0, 0, false);
+      expect(useEditorStore.getState().scene.collisionLayer?.[0]).toBe(0);
+    });
+
+    it('setSpawnPoint places spawn entity and replaces previous', () => {
+      useEditorStore.getState().setSpawnPoint(5, 3);
+      const ents1 = useEditorStore.getState().scene.entities!;
+      expect(ents1).toHaveLength(1);
+      expect(ents1[0].type).toBe('spawn');
+      expect(ents1[0].x).toBe(5);
+      // Setting again replaces
+      useEditorStore.getState().setSpawnPoint(2, 1);
+      const ents2 = useEditorStore.getState().scene.entities!;
+      expect(ents2).toHaveLength(1);
+      expect(ents2[0].x).toBe(2);
+    });
+
+    it('addExitZone creates exit entity with dimensions', () => {
+      useEditorStore.getState().addExitZone(0, 0, 2, 1);
+      const ents = useEditorStore.getState().scene.entities!;
+      const exit = ents.find((e) => e.type === 'exit');
+      expect(exit).toBeDefined();
+      expect(exit!.width).toBe(3);
+      expect(exit!.height).toBe(2);
+    });
+
+    it('addNpc creates npc entity', () => {
+      useEditorStore.getState().addNpc(10, 5);
+      const ents = useEditorStore.getState().scene.entities!;
+      const npc = ents.find((e) => e.type === 'npc');
+      expect(npc).toBeDefined();
+      expect(npc!.x).toBe(10);
+      expect(npc!.properties?.name).toBe('NPC');
+    });
+
+    it('removeEntity deletes entity', () => {
+      useEditorStore.getState().addNpc(0, 0);
+      const ents = useEditorStore.getState().scene.entities!;
+      expect(ents.length).toBeGreaterThan(0);
+      useEditorStore.getState().removeEntity(ents[ents.length - 1].id);
+    });
+
+    it('validateScene reports missing spawn', () => {
+      const msgs = useEditorStore.getState().validateScene();
+      expect(msgs.some((m) => m.message.includes('spawn'))).toBe(true);
+    });
+
+    it('validateScene reports exit without target', () => {
+      useEditorStore.getState().addExitZone(0, 0, 0, 0);
+      const msgs = useEditorStore.getState().validateScene();
+      expect(msgs.some((m) => m.message.includes('no target scene'))).toBe(true);
     });
   });
 });

@@ -46,9 +46,10 @@ export function Toolbar() {
         background: '#181825',
       }}
     >
-      <span style={{ fontSize: 14, fontWeight: 600, marginRight: 8 }}>
+      <span style={{ fontSize: 14, fontWeight: 600, marginRight: 4 }}>
         Tile Creator
       </span>
+      <span style={{ fontSize: 12, color: '#6c7086', marginRight: 8 }}>Art</span>
       {(['paint', 'erase', 'select', 'colorPaint'] as Tool[]).map((tool) => (
         <button
           key={tool}

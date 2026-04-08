@@ -1,10 +1,12 @@
-import type { SceneJSON, SceneCollection, TilesetRef, AnimationPhase, GroupAnimationPhase, GroupAnimation } from '@storyengine/shared';
+import type { SceneJSON, SceneCollection, TilesetRef, AnimationPhase, GroupAnimationPhase, GroupAnimation, EntityDef } from '@storyengine/shared';
 import type { StoredTileset } from '../lib/assetDb.js';
 
 export type Tool = 'paint' | 'erase' | 'select' | 'colorPaint';
+export type GameTool = 'collision' | 'spawn' | 'exit' | 'npc';
+export type EditorMode = 'art' | 'game';
 
-export interface ImportWarning {
-  level: 'info' | 'warn';
+export interface ValidationMessage {
+  level: 'error' | 'warn';
   message: string;
 }
 
@@ -68,6 +70,9 @@ export interface EditorState {
   animClock: number;
   animationLibrary: StoredAnimation[];
   editingGroupAnimationId: string | null;
+  editorMode: EditorMode;
+  activeGameTool: GameTool;
+  showCollisionOverlay: boolean;
 }
 
 export interface EditorActions {
@@ -127,6 +132,16 @@ export interface EditorActions {
   updateGroupAnimation: (id: string, phases: GroupAnimationPhase[]) => void;
   removeGroupAnimation: (id: string) => void;
   captureGroupFrame: (groupId: string) => void;
+  setEditorMode: (mode: EditorMode) => void;
+  setActiveGameTool: (tool: GameTool) => void;
+  toggleCollisionOverlay: () => void;
+  paintCollision: (x: number, y: number, blocked: boolean) => void;
+  setSpawnPoint: (x: number, y: number) => void;
+  addExitZone: (x1: number, y1: number, x2: number, y2: number) => void;
+  addNpc: (x: number, y: number) => void;
+  removeEntity: (id: string) => void;
+  updateEntity: (id: string, patch: Partial<EntityDef>) => void;
+  validateScene: () => ValidationMessage[];
 }
 
 export type EditorStore = EditorState & EditorActions;

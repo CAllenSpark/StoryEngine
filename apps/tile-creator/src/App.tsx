@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react';
 import { useEditorStore } from './store/editorStore.js';
 import { useTemporalStore } from './store/temporal.js';
 import { Toolbar } from './components/Toolbar.js';
+import { GameToolbar } from './components/GameToolbar.js';
 import { TilesetPanel } from './components/TilesetPanel.js';
 import { EditorCanvas } from './components/EditorCanvas.js';
 import { LayerPanel } from './components/LayerPanel.js';
@@ -13,6 +14,8 @@ import './App.css';
 
 export function App() {
   const { undo, redo } = useTemporalStore();
+  const editorMode = useEditorStore((s) => s.editorMode);
+  const setEditorMode = useEditorStore((s) => s.setEditorMode);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -53,6 +56,10 @@ export function App() {
         const tag = (e.target as HTMLElement)?.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA') return;
         useEditorStore.getState().toggleFlipV();
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        const mode = useEditorStore.getState().editorMode;
+        useEditorStore.getState().setEditorMode(mode === 'art' ? 'game' : 'art');
       }
     },
     [undo, redo],
@@ -72,14 +79,36 @@ export function App() {
 
   return (
     <div className="app">
-      <Toolbar />
+      {/* Mode switcher */}
+      <div style={{
+        display: 'flex', alignItems: 'center',
+        borderBottom: '1px solid #313244', background: '#11111b',
+      }}>
+        <button
+          className={editorMode === 'art' ? 'active' : ''}
+          onClick={() => setEditorMode('art')}
+          style={{ borderRadius: 0, borderBottom: editorMode === 'art' ? '2px solid #89b4fa' : '2px solid transparent' }}
+        >
+          Art Mode
+        </button>
+        <button
+          className={editorMode === 'game' ? 'active' : ''}
+          onClick={() => setEditorMode('game')}
+          style={{ borderRadius: 0, borderBottom: editorMode === 'game' ? '2px solid #a6e3a1' : '2px solid transparent' }}
+        >
+          Game Mode
+        </button>
+        <span style={{ marginLeft: 8, fontSize: 10, color: '#6c7086' }}>Tab to switch</span>
+      </div>
+
+      {editorMode === 'art' ? <Toolbar /> : <GameToolbar />}
       <div className="editor-layout">
-        <TilesetPanel />
+        {editorMode === 'art' && <TilesetPanel />}
         <EditorCanvas />
         <div className="right-panel">
           <LayerPanel />
           <CollectionPanel />
-          <PrefabPanel />
+          {editorMode === 'art' && <PrefabPanel />}
           <TilesetLibrary />
         </div>
       </div>

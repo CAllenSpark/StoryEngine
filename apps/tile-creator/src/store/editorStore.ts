@@ -86,6 +86,9 @@ export const useEditorStore = create<EditorStore>()(
       animClock: 0,
       animationLibrary: [],
       editingGroupAnimationId: null,
+      editorMode: 'art' as import('../types/editor.js').EditorMode,
+      activeGameTool: 'collision' as import('../types/editor.js').GameTool,
+      showCollisionOverlay: false,
 
       paintTile(x: number, y: number) {
         const { scene, activeLayerIndex, selectedTileId, tileset, currentRotation, currentFlipH, currentFlipV } = get();
@@ -705,6 +708,116 @@ export const useEditorStore = create<EditorStore>()(
           return { ...g, phases };
         });
         set({ scene: { ...scene, groupAnimations: updatedGroups } });
+      },
+
+      setEditorMode(mode: import('../types/editor.js').EditorMode) {
+        set({ editorMode: mode });
+        if (mode === 'game') set({ showCollisionOverlay: true });
+      },
+
+      setActiveGameTool(tool: import('../types/editor.js').GameTool) {
+        set({ activeGameTool: tool });
+      },
+
+      toggleCollisionOverlay() {
+        set((s) => ({ showCollisionOverlay: !s.showCollisionOverlay }));
+      },
+
+      paintCollision(x: number, y: number, blocked: boolean) {
+        const { scene } = get();
+        if (x < 0 || x >= scene.width || y < 0 || y >= scene.height) return;
+        const collision = scene.collisionLayer
+          ? [...scene.collisionLayer]
+          : new Array(scene.width * scene.height).fill(0);
+        const val = blocked ? 1 : 0;
+        const idx = y * scene.width + x;
+        if (collision[idx] === val) return;
+        collision[idx] = val;
+        set({ scene: { ...scene, collisionLayer: collision } });
+      },
+
+      setSpawnPoint(x: number, y: number) {
+        const { scene } = get();
+        const entities = (scene.entities ?? []).filter((e) => e.type !== 'spawn');
+        entities.push({ id: crypto.randomUUID(), type: 'spawn', x, y });
+        set({ scene: { ...scene, entities } });
+      },
+
+      addExitZone(x1: number, y1: number, x2: number, y2: number) {
+        const { scene } = get();
+        const entities = [...(scene.entities ?? [])];
+        entities.push({
+          id: crypto.randomUUID(),
+          type: 'exit',
+          x: Math.min(x1, x2),
+          y: Math.min(y1, y2),
+          width: Math.abs(x2 - x1) + 1,
+          height: Math.abs(y2 - y1) + 1,
+          properties: {},
+        });
+        set({ scene: { ...scene, entities } });
+      },
+
+      addNpc(x: number, y: number) {
+        const { scene } = get();
+        const entities = [...(scene.entities ?? [])];
+        entities.push({
+          id: crypto.randomUUID(),
+          type: 'npc',
+          x,
+          y,
+          properties: { name: 'NPC', dialogue: [] },
+        });
+        set({ scene: { ...scene, entities } });
+      },
+
+      removeEntity(id: string) {
+        const { scene } = get();
+        const entities = (scene.entities ?? []).filter((e) => e.id !== id);
+        set({ scene: { ...scene, entities: entities.length > 0 ? entities : undefined } });
+      },
+
+      updateEntity(id: string, patch: Partial<import('@storyengine/shared').EntityDef>) {
+        const { scene } = get();
+        const entities = (scene.entities ?? []).map((e) =>
+          e.id === id ? { ...e, ...patch } : e,
+        );
+        set({ scene: { ...scene, entities } });
+      },
+
+      validateScene(): import('../types/editor.js').ValidationMessage[] {
+        const { scene } = get();
+        const messages: import('../types/editor.js').ValidationMessage[] = [];
+        const entities = scene.entities ?? [];
+
+        const spawns = entities.filter((e) => e.type === 'spawn');
+        if (spawns.length === 0) {
+          messages.push({ level: 'error', message: 'No player spawn point defined' });
+        }
+        if (spawns.length > 1) {
+          messages.push({ level: 'warn', message: 'Multiple spawn points — only the first will be used' });
+        }
+
+        const exits = entities.filter((e) => e.type === 'exit');
+        for (const exit of exits) {
+          if (!exit.properties?.targetSceneId) {
+            messages.push({ level: 'error', message: `Exit at (${exit.x},${exit.y}) has no target scene` });
+          }
+        }
+
+        const npcs = entities.filter((e) => e.type === 'npc');
+        for (const npc of npcs) {
+          const dialogue = npc.properties?.dialogue as unknown[];
+          if (!dialogue || !Array.isArray(dialogue) || dialogue.length === 0) {
+            messages.push({ level: 'warn', message: `NPC "${npc.properties?.name ?? 'unnamed'}" at (${npc.x},${npc.y}) has no dialogue` });
+          }
+        }
+
+        if (!scene.collisionLayer) {
+          messages.push({ level: 'warn', message: 'No collision layer defined — all tiles are walkable' });
+        }
+
+        return messages;
       },
 
       async paintColor(x: number, y: number) {

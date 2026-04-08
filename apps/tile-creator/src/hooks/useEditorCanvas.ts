@@ -147,6 +147,69 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
         ctx.stroke();
       }
 
+      // Collision overlay
+      if (state.showCollisionOverlay && scene.collisionLayer) {
+        for (let y = 0; y < scene.height; y++) {
+          for (let x = 0; x < scene.width; x++) {
+            if (scene.collisionLayer[y * scene.width + x] === 1) {
+              ctx.fillStyle = 'rgba(243, 139, 168, 0.35)';
+              ctx.fillRect(x * ts * zoom, y * ts * zoom, ts * zoom, ts * zoom);
+              // Small X marker
+              ctx.strokeStyle = 'rgba(243, 139, 168, 0.6)';
+              ctx.lineWidth = 1;
+              const cx = x * ts * zoom + ts * zoom * 0.2;
+              const cy2 = y * ts * zoom + ts * zoom * 0.2;
+              const sz = ts * zoom * 0.6;
+              ctx.beginPath();
+              ctx.moveTo(cx, cy2); ctx.lineTo(cx + sz, cy2 + sz);
+              ctx.moveTo(cx + sz, cy2); ctx.lineTo(cx, cy2 + sz);
+              ctx.stroke();
+            }
+          }
+        }
+      }
+
+      // Entity markers
+      const entities = scene.entities ?? [];
+      for (const ent of entities) {
+        const ex = ent.x * ts * zoom;
+        const ey = ent.y * ts * zoom;
+        const ew = (ent.width ?? 1) * ts * zoom;
+        const eh = (ent.height ?? 1) * ts * zoom;
+
+        if (ent.type === 'spawn') {
+          ctx.fillStyle = 'rgba(166, 227, 161, 0.4)';
+          ctx.fillRect(ex, ey, ts * zoom, ts * zoom);
+          ctx.strokeStyle = '#a6e3a1';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(ex + 1, ey + 1, ts * zoom - 2, ts * zoom - 2);
+          ctx.fillStyle = '#a6e3a1';
+          ctx.font = `${Math.max(10, ts * zoom * 0.4)}px monospace`;
+          ctx.fillText('S', ex + 3, ey + ts * zoom - 4);
+        } else if (ent.type === 'exit') {
+          ctx.fillStyle = 'rgba(137, 180, 250, 0.3)';
+          ctx.fillRect(ex, ey, ew, eh);
+          ctx.strokeStyle = '#89b4fa';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([3, 3]);
+          ctx.strokeRect(ex + 1, ey + 1, ew - 2, eh - 2);
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#89b4fa';
+          ctx.font = `${Math.max(10, ts * zoom * 0.35)}px monospace`;
+          ctx.fillText('EXIT', ex + 3, ey + ts * zoom - 4);
+        } else if (ent.type === 'npc') {
+          ctx.fillStyle = 'rgba(249, 226, 175, 0.4)';
+          ctx.fillRect(ex, ey, ts * zoom, ts * zoom);
+          ctx.strokeStyle = '#f9e2af';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(ex + 1, ey + 1, ts * zoom - 2, ts * zoom - 2);
+          ctx.fillStyle = '#f9e2af';
+          ctx.font = `${Math.max(10, ts * zoom * 0.35)}px monospace`;
+          const name = (ent.properties?.name as string) ?? 'NPC';
+          ctx.fillText(name.slice(0, 3), ex + 2, ey + ts * zoom - 4);
+        }
+      }
+
       // Selection rectangle overlay
       if (selectionBounds) {
         const sx = selectionBounds.x1 * ts * zoom;
@@ -247,7 +310,16 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
 
   const applyTool = useCallback(
     (gx: number, gy: number) => {
-      const { activeTool, paintTile, eraseTile, paintColor } = useEditorStore.getState();
+      const state = useEditorStore.getState();
+      if (state.editorMode === 'game') {
+        const { activeGameTool, paintCollision, setSpawnPoint, addExitZone, addNpc } = state;
+        if (activeGameTool === 'collision') paintCollision(gx, gy, true);
+        else if (activeGameTool === 'spawn') setSpawnPoint(gx, gy);
+        else if (activeGameTool === 'exit') addExitZone(gx, gy, gx, gy);
+        else if (activeGameTool === 'npc') addNpc(gx, gy);
+        return;
+      }
+      const { activeTool, paintTile, eraseTile, paintColor } = state;
       if (activeTool === 'paint') paintTile(gx, gy);
       else if (activeTool === 'erase') eraseTile(gx, gy);
       else if (activeTool === 'colorPaint') paintColor(gx, gy);
@@ -260,10 +332,25 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
     if (!canvas) return;
 
     const onMouseDown = (e: MouseEvent) => {
-      if (e.button !== 0) return;
       const pos = toGrid(e);
       if (!pos) return;
-      const { activeTool, clipboard } = useEditorStore.getState();
+
+      // Game mode: right-click erases collision
+      const state = useEditorStore.getState();
+      if (state.editorMode === 'game' && state.activeGameTool === 'collision') {
+        if (e.button === 0) {
+          isPaintingRef.current = true;
+          applyTool(pos.x, pos.y);
+        } else if (e.button === 2) {
+          e.preventDefault();
+          state.paintCollision(pos.x, pos.y, false);
+          isPaintingRef.current = true;
+        }
+        return;
+      }
+
+      if (e.button !== 0) return;
+      const { activeTool, clipboard } = state;
 
       if (activeTool === 'select') {
         if (clipboard) {
@@ -288,7 +375,13 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
           pos.x, pos.y,
         );
       } else if (isPaintingRef.current && pos) {
-        applyTool(pos.x, pos.y);
+        // Right-click drag erases collision in game mode
+        const s = useEditorStore.getState();
+        if (s.editorMode === 'game' && s.activeGameTool === 'collision' && e.buttons === 2) {
+          s.paintCollision(pos.x, pos.y, false);
+        } else {
+          applyTool(pos.x, pos.y);
+        }
       }
       scheduleRender();
     };
@@ -310,10 +403,14 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
       scheduleRender();
     };
 
+    const onContextMenu = (e: MouseEvent) => {
+      if (useEditorStore.getState().editorMode === 'game') e.preventDefault();
+    };
     canvas.addEventListener('mousedown', onMouseDown);
     canvas.addEventListener('mousemove', onMouseMove);
     canvas.addEventListener('mouseup', onMouseUp);
     canvas.addEventListener('mouseleave', onMouseLeave);
+    canvas.addEventListener('contextmenu', onContextMenu);
     window.addEventListener('mouseup', onMouseUp);
 
     return () => {
@@ -321,6 +418,7 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
       canvas.removeEventListener('mousemove', onMouseMove);
       canvas.removeEventListener('mouseup', onMouseUp);
       canvas.removeEventListener('mouseleave', onMouseLeave);
+      canvas.removeEventListener('contextmenu', onContextMenu);
       window.removeEventListener('mouseup', onMouseUp);
     };
   }, [canvasRef, toGrid, applyTool, scheduleRender]);
