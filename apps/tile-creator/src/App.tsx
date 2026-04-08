@@ -9,6 +9,7 @@ import { LayerPanel } from './components/LayerPanel.js';
 import { TilesetLibrary } from './components/TilesetLibrary.js';
 import { CollectionPanel } from './components/CollectionPanel.js';
 import { PrefabPanel } from './components/PrefabPanel.js';
+import { EntityPanel } from './components/EntityPanel.js';
 import { ExportBar } from './components/ExportBar.js';
 import './App.css';
 
@@ -106,9 +107,10 @@ export function App() {
         {editorMode === 'art' && <TilesetPanel />}
         <EditorCanvas />
         <div className="right-panel">
-          <LayerPanel />
+          {editorMode === 'art' && <LayerPanel />}
           <CollectionPanel />
           {editorMode === 'art' && <PrefabPanel />}
+          {editorMode === 'game' && <EntityPanel />}
           <TilesetLibrary />
         </div>
       </div>
