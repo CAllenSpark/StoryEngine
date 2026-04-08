@@ -3,7 +3,6 @@ import { migrateTileAnimation } from '@storyengine/shared';
 
 interface AnimInstanceState {
   currentPhase: number;
-  loopsCompleted: number;
   frameIndex: number;
   phaseAccum: number;
   finished: boolean;
@@ -14,7 +13,7 @@ export class Tilemap {
   private animStates: Map<number, AnimInstanceState> = new Map();
   private groupAnims: GroupAnimation[] = [];
   private groupStates: Map<string, AnimInstanceState> = new Map();
-  private groupOverlay: Map<string, number> = new Map();
+  private groupOverlay: Map<number, number> = new Map();
 
   constructor(
     readonly width: number,
@@ -62,13 +61,9 @@ export class Tilemap {
   }
 
   updateAnimations(dt: number): void {
-    // Per-tile animations
-    for (const [, anim] of this.animations) {
-      // Find state by iterating (we need baseTileId as key)
-    }
     for (const [baseTileId, anim] of this.animations) {
       const state = this.animStates.get(baseTileId)!;
-      advancePhased(state, anim.phases.map((p) => ({ frameCount: p.frames.length, speed: p.speed, loops: p.loops })), dt);
+      advancePhased(state, anim.phases, dt);
     }
 
     // Group animations — rebuild overlay
@@ -76,7 +71,7 @@ export class Tilemap {
     for (const g of this.groupAnims) {
       const state = this.groupStates.get(g.id);
       if (!state) continue;
-      advancePhased(state, g.phases.map((p) => ({ frameCount: p.frames.length, speed: p.speed, loops: p.loops })), dt);
+      advancePhased(state, g.phases, dt);
 
       const phase = g.phases[state.currentPhase];
       if (!phase) continue;
@@ -87,7 +82,7 @@ export class Tilemap {
         for (let gx = 0; gx < g.width; gx++) {
           const tileId = frame.tiles[gy * g.width + gx];
           if (tileId !== undefined && tileId >= 0) {
-            this.groupOverlay.set(`${g.x + gx},${g.y + gy}:${g.layer}`, tileId);
+            this.groupOverlay.set(overlayKey(g.x + gx, g.y + gy, g.layer), tileId);
           }
         }
       }
@@ -96,7 +91,7 @@ export class Tilemap {
 
   resolveAnimatedTile(tileId: number, x?: number, y?: number, layerIndex?: number): number {
     if (x !== undefined && y !== undefined && layerIndex !== undefined) {
-      const groupTile = this.groupOverlay.get(`${x},${y}:${layerIndex}`);
+      const groupTile = this.groupOverlay.get(overlayKey(x, y, layerIndex));
       if (groupTile !== undefined) return groupTile;
     }
     const anim = this.animations.get(tileId);
@@ -113,22 +108,27 @@ export class Tilemap {
   }
 }
 
+function overlayKey(x: number, y: number, layer: number): number {
+  return x + y * 1024 + layer * 1048576;
+}
+
 function newAnimState(): AnimInstanceState {
-  return { currentPhase: 0, loopsCompleted: 0, frameIndex: 0, phaseAccum: 0, finished: false };
+  return { currentPhase: 0, frameIndex: 0, phaseAccum: 0, finished: false };
 }
 
 function advancePhased(
   state: AnimInstanceState,
-  phases: { frameCount: number; speed: number; loops?: number }[],
+  phases: readonly { readonly frames: readonly unknown[]; readonly speed: number; readonly loops?: number }[],
   dt: number,
 ): void {
   if (state.finished) return;
   const phase = phases[state.currentPhase];
-  if (!phase || phase.frameCount === 0) { state.finished = true; return; }
+  if (!phase || phase.frames.length === 0) { state.finished = true; return; }
 
   state.phaseAccum += dt;
+  const frameCount = phase.frames.length;
   const frameDuration = 1000 / phase.speed;
-  const cycleDuration = frameDuration * phase.frameCount;
+  const cycleDuration = frameDuration * frameCount;
 
   if (phase.loops !== undefined) {
     const totalTime = cycleDuration * phase.loops;
@@ -136,11 +136,10 @@ function advancePhased(
       if (state.currentPhase + 1 < phases.length) {
         state.currentPhase++;
         state.phaseAccum -= totalTime;
-        state.loopsCompleted = 0;
         state.frameIndex = 0;
       } else {
         state.finished = true;
-        state.frameIndex = phase.frameCount - 1;
+        state.frameIndex = frameCount - 1;
       }
     } else {
       state.frameIndex = Math.floor((state.phaseAccum % cycleDuration) / frameDuration);

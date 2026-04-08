@@ -2,47 +2,20 @@ import { useEffect, useRef, useCallback, type RefObject } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
 import { decodeTransform } from '../lib/transformUtils.js';
 import type { TileAnimation } from '@storyengine/shared';
-import { migrateTileAnimation } from '@storyengine/shared';
+import { migrateTileAnimation, resolvePhaseFrame } from '@storyengine/shared';
 
 function resolveAnimatedTile(
   tileId: number,
-  animations: Record<string, TileAnimation> | undefined,
+  migratedAnims: Map<string, TileAnimation> | null,
   clock: number,
   tileCount: number,
 ): number {
-  if (!animations) return tileId;
-  const raw = animations[String(tileId)];
-  if (!raw) return tileId;
-  const anim = migrateTileAnimation(raw);
-  if (anim.phases.length === 0) return tileId;
-
-  let resolved = tileId;
-  let remaining = clock;
-  for (let pi = 0; pi < anim.phases.length; pi++) {
-    const phase = anim.phases[pi];
-    if (phase.frames.length === 0) continue;
-    const frameDuration = 1000 / phase.speed;
-    const cycleDuration = frameDuration * phase.frames.length;
-
-    if (phase.loops !== undefined) {
-      const phaseTotalTime = cycleDuration * phase.loops;
-      if (remaining < phaseTotalTime) {
-        const t = remaining % cycleDuration;
-        resolved = phase.frames[Math.floor(t / frameDuration)] ?? tileId;
-        return resolved < tileCount ? resolved : tileId;
-      }
-      remaining -= phaseTotalTime;
-    } else {
-      const t = remaining % cycleDuration;
-      resolved = phase.frames[Math.floor(t / frameDuration)] ?? tileId;
-      return resolved < tileCount ? resolved : tileId;
-    }
-  }
-
-  const lastPhase = anim.phases[anim.phases.length - 1];
-  if (lastPhase && lastPhase.frames.length > 0) {
-    resolved = lastPhase.frames[lastPhase.frames.length - 1] ?? tileId;
-  }
+  if (!migratedAnims) return tileId;
+  const anim = migratedAnims.get(String(tileId));
+  if (!anim) return tileId;
+  const result = resolvePhaseFrame(anim.phases, clock);
+  if (!result) return tileId;
+  const resolved = anim.phases[result.phaseIndex]?.frames[result.frameIndex] ?? tileId;
   return resolved < tileCount ? resolved : tileId;
 }
 
@@ -50,26 +23,9 @@ function resolveGroupFrame(
   group: import('@storyengine/shared').GroupAnimation,
   clock: number,
 ): import('@storyengine/shared').GroupAnimationFrame | null {
-  let remaining = clock;
-  for (const phase of group.phases) {
-    if (phase.frames.length === 0) continue;
-    const frameDuration = 1000 / phase.speed;
-    const cycleDuration = frameDuration * phase.frames.length;
-    if (phase.loops !== undefined) {
-      const total = cycleDuration * phase.loops;
-      if (remaining < total) {
-        return phase.frames[Math.floor((remaining % cycleDuration) / frameDuration)] ?? null;
-      }
-      remaining -= total;
-    } else {
-      return phase.frames[Math.floor((remaining % cycleDuration) / frameDuration)] ?? null;
-    }
-  }
-  const lastPhase = group.phases[group.phases.length - 1];
-  if (lastPhase && lastPhase.frames.length > 0) {
-    return lastPhase.frames[lastPhase.frames.length - 1] ?? null;
-  }
-  return null;
+  const result = resolvePhaseFrame(group.phases, clock);
+  if (!result) return null;
+  return group.phases[result.phaseIndex]?.frames[result.frameIndex] ?? null;
 }
 
 const GRID_COLOR = '#45475a';
@@ -96,7 +52,15 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
 
       const state = useEditorStore.getState();
       const { scene, layerVisibility, zoom, tileset, selectionBounds, clipboard, activeTool, animClock } = state;
-      const animations = tileset?.ref.animations;
+      // Pre-migrate animations once per render (not per-tile)
+      const rawAnims = tileset?.ref.animations;
+      let migratedAnims: Map<string, TileAnimation> | null = null;
+      if (rawAnims) {
+        migratedAnims = new Map();
+        for (const [key, raw] of Object.entries(rawAnims)) {
+          migratedAnims.set(key, migrateTileAnimation(raw));
+        }
+      }
       const ts = scene.tileSize;
       const w = scene.width * ts * zoom;
       const h = scene.height * ts * zoom;
@@ -111,7 +75,7 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
       ctx.fillRect(0, 0, w, h);
 
       // Build group animation overlay
-      const groupOverlay = new Map<string, number>();
+      const groupOverlay = new Map<number, number>();
       for (const group of scene.groupAnimations ?? []) {
         const frame = resolveGroupFrame(group, animClock);
         if (!frame) continue;
@@ -119,7 +83,7 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
           for (let gx = 0; gx < group.width; gx++) {
             const tid = frame.tiles[gy * group.width + gx];
             if (tid !== undefined && tid >= 0) {
-              groupOverlay.set(`${group.x + gx},${group.y + gy}:${group.layer}`, tid);
+              groupOverlay.set((group.x + gx) + (group.y + gy) * 1024 + group.layer * 1048576, tid);
             }
           }
         }
@@ -135,12 +99,12 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
             const dataIdx = y * scene.width + x;
             const rawTileId = layer.data[dataIdx];
             // Check group overlay first
-            const groupTile = groupOverlay.get(`${x},${y}:${li}`);
+            const groupTile = groupOverlay.get(x + y * 1024 + li * 1048576);
             const baseTile = groupTile !== undefined ? groupTile : rawTileId;
             if (baseTile < 0) continue;
             const tileId = groupTile !== undefined
               ? groupTile
-              : resolveAnimatedTile(rawTileId, animations, animClock, tileCount);
+              : resolveAnimatedTile(rawTileId, migratedAnims, animClock, tileCount);
             const px = x * ts * zoom;
             const py = y * ts * zoom;
             const sz = ts * zoom;
@@ -246,15 +210,26 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
     };
   }, [scheduleRender]);
 
-  // Animation preview tick — only active when scene has animated tiles
+  // Animation preview tick — only active when scene has animated tiles or group animations
   useEffect(() => {
-    const anims = useEditorStore.getState().tileset?.ref.animations;
-    if (!anims || Object.keys(anims).length === 0) return;
-    const interval = setInterval(() => {
-      useEditorStore.getState().tickAnimation();
-    }, 250);
-    return () => clearInterval(interval);
-  });
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const startTick = () => {
+      const state = useEditorStore.getState();
+      const hasAnims = state.tileset?.ref.animations && Object.keys(state.tileset.ref.animations).length > 0;
+      const hasGroups = (state.scene.groupAnimations?.length ?? 0) > 0;
+      if (hasAnims || hasGroups) {
+        if (!interval) {
+          interval = setInterval(() => { useEditorStore.getState().tickAnimation(); }, 250);
+        }
+      } else if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+    startTick();
+    const unsub = useEditorStore.subscribe(startTick);
+    return () => { unsub(); if (interval) clearInterval(interval); };
+  }, []);
 
   const toGrid = useCallback(
     (e: MouseEvent): { x: number; y: number } | null => {

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
-import { migrateTileAnimation } from '@storyengine/shared';
+import { migrateTileAnimation, resolvePhaseFrame } from '@storyengine/shared';
 import type { AnimationPhase } from '@storyengine/shared';
 
 interface AnimationDialogProps {
@@ -36,36 +36,11 @@ export function AnimationDialog({ baseTileId, onClose }: AnimationDialogProps) {
   // Time-based preview clock
   const [previewClock, setPreviewClock] = useState(0);
 
-  // Resolve current preview frame from clock using proper per-phase timing
-  const resolvePreviewFrame = (): number => {
-    let remaining = previewClock;
-    for (let pi = 0; pi < phases.length; pi++) {
-      const phase = phases[pi];
-      if (phase.frames.length === 0) continue;
-      const frameDuration = 1000 / phase.speed;
-      const cycleDuration = frameDuration * phase.frames.length;
-      if (phase.loops !== undefined) {
-        const phaseTotalTime = cycleDuration * phase.loops;
-        if (remaining < phaseTotalTime) {
-          const t = remaining % cycleDuration;
-          return phase.frames[Math.floor(t / frameDuration)] ?? baseTileId;
-        }
-        remaining -= phaseTotalTime;
-      } else {
-        // Infinite loop
-        const t = remaining % cycleDuration;
-        return phase.frames[Math.floor(t / frameDuration)] ?? baseTileId;
-      }
-    }
-    // All finite phases done — last frame of last phase
-    const lastPhase = phases[phases.length - 1];
-    if (lastPhase && lastPhase.frames.length > 0) {
-      return lastPhase.frames[lastPhase.frames.length - 1] ?? baseTileId;
-    }
-    return baseTileId;
-  };
-
-  const currentPreviewTileId = resolvePreviewFrame();
+  const currentPreviewTileId = (() => {
+    const result = resolvePhaseFrame(phases, previewClock);
+    if (!result) return baseTileId;
+    return phases[result.phaseIndex]?.frames[result.frameIndex] ?? baseTileId;
+  })();
 
   // Tick the preview clock — use fastest phase speed for smooth preview
   useEffect(() => {

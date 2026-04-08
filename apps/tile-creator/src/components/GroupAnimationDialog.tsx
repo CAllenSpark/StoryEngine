@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
+import { resolvePhaseFrame } from '@storyengine/shared';
 import type { GroupAnimationPhase } from '@storyengine/shared';
 
 interface GroupAnimationDialogProps {
@@ -33,28 +34,11 @@ export function GroupAnimationDialog({ groupId, onClose }: GroupAnimationDialogP
     return () => clearInterval(interval);
   }, [phases, activePhaseIdx]);
 
-  // Resolve current preview frame
-  const resolveFrame = () => {
-    let remaining = previewClock;
-    for (const phase of phases) {
-      if (phase.frames.length === 0) continue;
-      const frameDuration = 1000 / phase.speed;
-      const cycleDuration = frameDuration * phase.frames.length;
-      if (phase.loops !== undefined) {
-        const total = cycleDuration * phase.loops;
-        if (remaining < total) {
-          return phase.frames[Math.floor((remaining % cycleDuration) / frameDuration)];
-        }
-        remaining -= total;
-      } else {
-        return phase.frames[Math.floor((remaining % cycleDuration) / frameDuration)];
-      }
-    }
-    const lastPhase = phases[phases.length - 1];
-    return lastPhase?.frames[lastPhase.frames.length - 1];
-  };
-
-  const currentFrame = resolveFrame();
+  const currentFrame = (() => {
+    const result = resolvePhaseFrame(phases, previewClock);
+    if (!result) return undefined;
+    return phases[result.phaseIndex]?.frames[result.frameIndex];
+  })();
 
   // Draw preview
   useEffect(() => {
