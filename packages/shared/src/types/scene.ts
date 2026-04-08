@@ -55,12 +55,39 @@ export interface GroupAnimation {
 
 export interface EntityDef {
   id: string;
-  type: 'spawn' | 'npc' | 'exit';
+  type: 'spawn' | 'npc' | 'exit' | 'action';
   x: number;
   y: number;
   width?: number;
   height?: number;
   properties?: Record<string, unknown>;
+}
+
+export type ActionTrigger = 'step' | 'interact' | 'auto' | 'conditional';
+
+export type ActionType =
+  | 'showDialogue'
+  | 'playGroupAnimation'
+  | 'changeScene'
+  | 'playVideo'
+  | 'playAudio'
+  | 'stopAudio'
+  | 'showImage'
+  | 'showSlideshow'
+  | 'playerInput'
+  | 'changePlayerState'
+  | 'playActorAnimation';
+
+export interface ActionStep {
+  type: ActionType;
+  params: Record<string, unknown>;
+}
+
+export interface ActionDef {
+  trigger: ActionTrigger;
+  condition?: { flag?: string; item?: string };
+  steps: ActionStep[];
+  oneShot?: boolean;
 }
 
 export interface DialogueLine {

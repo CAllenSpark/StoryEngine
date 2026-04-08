@@ -207,6 +207,16 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
           ctx.font = `${Math.max(10, ts * zoom * 0.35)}px monospace`;
           const name = (ent.properties?.name as string) ?? 'NPC';
           ctx.fillText(name.slice(0, 3), ex + 2, ey + ts * zoom - 4);
+        } else if (ent.type === 'action') {
+          ctx.fillStyle = 'rgba(203, 166, 247, 0.4)';
+          ctx.fillRect(ex, ey, ts * zoom, ts * zoom);
+          ctx.strokeStyle = '#cba6f7';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(ex + 1, ey + 1, ts * zoom - 2, ts * zoom - 2);
+          ctx.fillStyle = '#cba6f7';
+          ctx.font = `${Math.max(10, ts * zoom * 0.35)}px monospace`;
+          const trigger = ((ent.properties?.action as Record<string, unknown>)?.trigger as string) ?? '?';
+          ctx.fillText(trigger.slice(0, 4).toUpperCase(), ex + 2, ey + ts * zoom - 4);
         }
       }
 
@@ -317,6 +327,7 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
         else if (activeGameTool === 'spawn') setSpawnPoint(gx, gy);
         else if (activeGameTool === 'exit') addExitZone(gx, gy, gx, gy);
         else if (activeGameTool === 'npc') addNpc(gx, gy);
+        else if (activeGameTool === 'action') state.addAction(gx, gy);
         return;
       }
       const { activeTool, paintTile, eraseTile, paintColor } = state;

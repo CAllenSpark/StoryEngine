@@ -1,17 +1,21 @@
 import { useState } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
+import { ActionEditor } from './ActionEditor.js';
 import type { ValidationMessage } from '../types/editor.js';
+import type { ActionDef } from '@storyengine/shared';
 
 export function EntityPanel() {
   const scene = useEditorStore((s) => s.scene);
   const collection = useEditorStore((s) => s.currentCollection);
   const entities = scene.entities ?? [];
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingActionId, setEditingActionId] = useState<string | null>(null);
   const [collectionErrors, setCollectionErrors] = useState<ValidationMessage[]>([]);
 
   const spawns = entities.filter((e) => e.type === 'spawn');
   const exits = entities.filter((e) => e.type === 'exit');
   const npcs = entities.filter((e) => e.type === 'npc');
+  const actions = entities.filter((e) => e.type === 'action');
 
   const otherScenes = collection?.scenes.filter(
     (s) => s.id !== useEditorStore.getState().currentSceneId,
@@ -176,6 +180,40 @@ export function EntityPanel() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Actions */}
+      {actions.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#cba6f7' }}>Actions</div>
+          {actions.map((act) => {
+            const actionDef = act.properties?.action as ActionDef | undefined;
+            const stepCount = actionDef?.steps?.length ?? 0;
+            const triggerLabel = actionDef?.trigger ?? 'interact';
+            return (
+              <div key={act.id} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, padding: '1px 0' }}>
+                <span>({act.x},{act.y})</span>
+                <span style={{ color: '#6c7086' }}>{triggerLabel}</span>
+                <span style={{ color: '#6c7086' }}>{stepCount} step{stepCount !== 1 ? 's' : ''}</span>
+                <button
+                  onClick={() => setEditingActionId(act.id)}
+                  style={{ fontSize: 9, padding: '0 4px', color: '#cba6f7' }}
+                >edit</button>
+                <button
+                  onClick={() => useEditorStore.getState().removeEntity(act.id)}
+                  style={{ fontSize: 9, color: '#f38ba8', padding: '0 3px', marginLeft: 'auto' }}
+                >x</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {editingActionId && (
+        <ActionEditor
+          entityId={editingActionId}
+          onClose={() => setEditingActionId(null)}
+        />
       )}
 
       {/* Collection validation */}

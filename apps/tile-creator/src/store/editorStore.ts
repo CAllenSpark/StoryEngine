@@ -771,6 +771,25 @@ export const useEditorStore = create<EditorStore>()(
         set({ scene: { ...scene, entities } });
       },
 
+      addAction(x: number, y: number) {
+        const { scene } = get();
+        const entities = [...(scene.entities ?? [])];
+        entities.push({
+          id: crypto.randomUUID(),
+          type: 'action',
+          x,
+          y,
+          properties: {
+            action: {
+              trigger: 'interact',
+              steps: [],
+              oneShot: false,
+            },
+          },
+        });
+        set({ scene: { ...scene, entities } });
+      },
+
       removeEntity(id: string) {
         const { scene } = get();
         const entities = (scene.entities ?? []).filter((e) => e.id !== id);

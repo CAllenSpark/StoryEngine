@@ -7,6 +7,7 @@ const GAME_TOOL_LABELS: Record<GameTool, string> = {
   spawn: 'Spawn',
   exit: 'Exit Zone',
   npc: 'NPC',
+  action: 'Action',
 };
 
 export function GameToolbar() {
@@ -36,7 +37,7 @@ export function GameToolbar() {
         <span style={{ fontSize: 14, fontWeight: 600, marginRight: 8, color: '#a6e3a1' }}>
           Game Mode
         </span>
-        {(['collision', 'spawn', 'exit', 'npc'] as GameTool[]).map((tool) => (
+        {(['collision', 'spawn', 'exit', 'npc', 'action'] as GameTool[]).map((tool) => (
           <button
             key={tool}
             className={activeGameTool === tool ? 'active' : ''}
@@ -67,6 +68,7 @@ export function GameToolbar() {
         {activeGameTool === 'spawn' && 'Click a tile to set player start position. Green marker.'}
         {activeGameTool === 'exit' && 'Click a tile to place an exit zone. Blue marker.'}
         {activeGameTool === 'npc' && 'Click a tile to place an NPC. Yellow marker.'}
+        {activeGameTool === 'action' && 'Click a tile to place an action trigger. Purple marker. Click entity to edit.'}
       </div>
 
       {/* Validation messages */}

@@ -649,6 +649,17 @@ describe('editorStore', () => {
       expect(msgs.some((m) => m.message.includes('spawn'))).toBe(true);
     });
 
+    it('addAction creates action entity', () => {
+      useEditorStore.getState().addAction(3, 7);
+      const ents = useEditorStore.getState().scene.entities!;
+      const action = ents.find((e) => e.type === 'action');
+      expect(action).toBeDefined();
+      expect(action!.x).toBe(3);
+      expect(action!.y).toBe(7);
+      expect((action!.properties?.action as any)?.trigger).toBe('interact');
+      expect((action!.properties?.action as any)?.steps).toEqual([]);
+    });
+
     it('validateScene reports exit without target', () => {
       useEditorStore.getState().addExitZone(0, 0, 0, 0);
       const msgs = useEditorStore.getState().validateScene();

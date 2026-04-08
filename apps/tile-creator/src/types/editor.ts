@@ -2,7 +2,7 @@ import type { SceneJSON, SceneCollection, TilesetRef, AnimationPhase, GroupAnima
 import type { StoredTileset } from '../lib/assetDb.js';
 
 export type Tool = 'paint' | 'erase' | 'select' | 'colorPaint';
-export type GameTool = 'collision' | 'spawn' | 'exit' | 'npc';
+export type GameTool = 'collision' | 'spawn' | 'exit' | 'npc' | 'action';
 export type EditorMode = 'art' | 'game';
 
 export interface ValidationMessage {
@@ -139,6 +139,7 @@ export interface EditorActions {
   setSpawnPoint: (x: number, y: number) => void;
   addExitZone: (x1: number, y1: number, x2: number, y2: number) => void;
   addNpc: (x: number, y: number) => void;
+  addAction: (x: number, y: number) => void;
   removeEntity: (id: string) => void;
   updateEntity: (id: string, patch: Partial<EntityDef>) => void;
   validateScene: () => ValidationMessage[];
