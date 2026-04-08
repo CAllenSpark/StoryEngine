@@ -188,4 +188,31 @@ describe('loadTilemap', () => {
     expect(tilemap.hasAnimations).toBe(false);
     expect(tilemap.resolveAnimatedTile(0)).toBe(0);
   });
+
+  describe('collision layer', () => {
+    it('isWalkable returns true when no collision layer', () => {
+      const tilemap = loadTilemap(validScene);
+      expect(tilemap.isWalkable(0, 0)).toBe(true);
+      expect(tilemap.isWalkable(2, 1)).toBe(true);
+    });
+
+    it('isWalkable returns false for out of bounds', () => {
+      const tilemap = loadTilemap(validScene);
+      expect(tilemap.isWalkable(-1, 0)).toBe(false);
+      expect(tilemap.isWalkable(3, 0)).toBe(false);
+      expect(tilemap.isWalkable(0, 2)).toBe(false);
+    });
+
+    it('isWalkable respects collision data', () => {
+      const scene: SceneJSON = {
+        ...validScene,
+        collisionLayer: [0, 1, 0, 0, 0, 1],
+      };
+      const tilemap = loadTilemap(scene);
+      expect(tilemap.isWalkable(0, 0)).toBe(true);
+      expect(tilemap.isWalkable(1, 0)).toBe(false); // blocked
+      expect(tilemap.isWalkable(2, 0)).toBe(true);
+      expect(tilemap.isWalkable(2, 1)).toBe(false); // blocked
+    });
+  });
 });

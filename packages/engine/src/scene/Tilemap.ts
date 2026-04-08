@@ -14,6 +14,7 @@ export class Tilemap {
   private groupAnims: GroupAnimation[] = [];
   private groupStates: Map<string, AnimInstanceState> = new Map();
   private groupOverlay: Map<number, number> = new Map();
+  private collision: number[] | null = null;
 
   constructor(
     readonly width: number,
@@ -21,6 +22,16 @@ export class Tilemap {
     readonly tileSize: number,
     readonly layers: TileLayer[],
   ) {}
+
+  setCollisionLayer(data: number[] | undefined): void {
+    this.collision = data ?? null;
+  }
+
+  isWalkable(x: number, y: number): boolean {
+    if (x < 0 || y < 0 || x >= this.width || y >= this.height) return false;
+    if (!this.collision) return true;
+    return this.collision[y * this.width + x] === 0;
+  }
 
   get pixelWidth(): number {
     return this.width * this.tileSize;

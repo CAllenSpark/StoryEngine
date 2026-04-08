@@ -53,6 +53,28 @@ export interface GroupAnimation {
   layer: number;
 }
 
+export interface EntityDef {
+  id: string;
+  type: 'spawn' | 'npc' | 'exit';
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  properties?: Record<string, unknown>;
+}
+
+export interface DialogueLine {
+  speaker: string;
+  text: string;
+}
+
+export interface SceneConnection {
+  direction: string;
+  targetSceneId: string;
+  spawnX: number;
+  spawnY: number;
+}
+
 export interface SceneJSON {
   version: number;
   width: number;
@@ -61,24 +83,15 @@ export interface SceneJSON {
   layers: TileLayer[];
   tileset: TilesetRef;
   groupAnimations?: GroupAnimation[];
+  collisionLayer?: number[];
+  entities?: EntityDef[];
 }
 
-/**
- * A single scene within a collection.
- *
- * Planned extension fields (non-breaking, all optional):
- *   worldPosition?: { gridX: number; gridY: number }
- *   connections?: { direction: 'north'|'south'|'east'|'west'; targetSceneId: string }[]
- *
- * These allow scenes to be positioned on a world-map grid with directional
- * connections. A scene card can be reused at multiple positions (e.g., a road
- * tile repeated 4 times on the way to a castle). Implemented in a future
- * "world map layout" tool.
- */
 export interface SceneEntry {
   id: string;
   name: string;
   scene: SceneJSON;
+  connections?: SceneConnection[];
 }
 
 export interface SceneCollection {

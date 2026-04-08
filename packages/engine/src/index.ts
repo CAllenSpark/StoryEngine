@@ -15,8 +15,12 @@ export { loadTilemap } from './scene/TilemapLoader.js';
 
 // Actor
 export { Actor } from './actor/Actor.js';
+export type { ActorType, Facing } from './actor/Actor.js';
 export { ActorPool } from './actor/ActorPool.js';
 export { ActorSystem } from './actor/ActorSystem.js';
+
+// Input
+export { InputManager } from './input/InputManager.js';
 
 // Debug
 export { parseDebugFlags } from './debug/DebugFlags.js';
