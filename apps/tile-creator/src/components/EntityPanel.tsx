@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
 import { ActionEditor } from './ActionEditor.js';
+import { NpcEditor } from './NpcEditor.js';
 import type { ValidationMessage } from '../types/editor.js';
-import type { ActionDef } from '@storyengine/shared';
+import type { ActionDef, DialogueLine } from '@storyengine/shared';
 
 export function EntityPanel() {
   const scene = useEditorStore((s) => s.scene);
   const collection = useEditorStore((s) => s.currentCollection);
   const entities = scene.entities ?? [];
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingNpcId, setEditingNpcId] = useState<string | null>(null);
   const [editingActionId, setEditingActionId] = useState<string | null>(null);
   const [collectionErrors, setCollectionErrors] = useState<ValidationMessage[]>([]);
 
@@ -170,16 +172,33 @@ export function EntityPanel() {
       {npcs.length > 0 && (
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#f9e2af' }}>NPCs</div>
-          {npcs.map((npc) => (
-            <div key={npc.id} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, padding: '1px 0' }}>
-              <span>{(npc.properties?.name as string) ?? 'NPC'} ({npc.x},{npc.y})</span>
-              <button
-                onClick={() => useEditorStore.getState().removeEntity(npc.id)}
-                style={{ fontSize: 9, color: '#f38ba8', padding: '0 3px', marginLeft: 'auto' }}
-              >x</button>
-            </div>
-          ))}
+          {npcs.map((npc) => {
+            const dialogue = (npc.properties?.dialogue as DialogueLine[]) ?? [];
+            return (
+              <div key={npc.id} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, padding: '1px 0' }}>
+                <span>{(npc.properties?.name as string) ?? 'NPC'} ({npc.x},{npc.y})</span>
+                <span style={{ color: '#6c7086' }}>
+                  {dialogue.length} line{dialogue.length !== 1 ? 's' : ''}
+                </span>
+                <button
+                  onClick={() => setEditingNpcId(npc.id)}
+                  style={{ fontSize: 9, padding: '0 4px', color: '#f9e2af' }}
+                >edit</button>
+                <button
+                  onClick={() => useEditorStore.getState().removeEntity(npc.id)}
+                  style={{ fontSize: 9, color: '#f38ba8', padding: '0 3px', marginLeft: 'auto' }}
+                >x</button>
+              </div>
+            );
+          })}
         </div>
+      )}
+
+      {editingNpcId && (
+        <NpcEditor
+          entityId={editingNpcId}
+          onClose={() => setEditingNpcId(null)}
+        />
       )}
 
       {/* Actions */}

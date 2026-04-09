@@ -600,6 +600,22 @@ describe('editorStore', () => {
       expect(useEditorStore.getState().showCollisionOverlay).toBe(true);
     });
 
+    it('setEditorMode clears art selection state on switch to game', () => {
+      useEditorStore.getState().selectArea(0, 0, 2, 2);
+      useEditorStore.getState().copySelection();
+      useEditorStore.getState().setBrushStamp({
+        width: 2, height: 1,
+        tiles: [{ dx: 0, dy: 0, tileId: 0 }, { dx: 1, dy: 0, tileId: 1 }],
+      });
+      expect(useEditorStore.getState().selectionBounds).not.toBeNull();
+      expect(useEditorStore.getState().clipboard).not.toBeNull();
+      expect(useEditorStore.getState().brushStamp).not.toBeNull();
+      useEditorStore.getState().setEditorMode('game');
+      expect(useEditorStore.getState().selectionBounds).toBeNull();
+      expect(useEditorStore.getState().clipboard).toBeNull();
+      expect(useEditorStore.getState().brushStamp).toBeNull();
+    });
+
     it('paintCollision sets and unsets collision data', () => {
       useEditorStore.getState().paintCollision(0, 0, true);
       expect(useEditorStore.getState().scene.collisionLayer?.[0]).toBe(1);

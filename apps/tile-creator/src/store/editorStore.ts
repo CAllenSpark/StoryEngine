@@ -745,7 +745,12 @@ export const useEditorStore = create<EditorStore>()(
       },
 
       setEditorMode(mode: import('../types/editor.js').EditorMode) {
-        set({ editorMode: mode });
+        set({
+          editorMode: mode,
+          selectionBounds: null,
+          clipboard: null,
+          brushStamp: null,
+        });
         if (mode === 'game') set({ showCollisionOverlay: true });
       },
 

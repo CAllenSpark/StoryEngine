@@ -358,15 +358,18 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
   );
 
   const applyTool = useCallback(
-    (gx: number, gy: number) => {
+    (gx: number, gy: number, isDrag = false) => {
       const state = useEditorStore.getState();
       if (state.editorMode === 'game') {
-        const { activeGameTool, paintCollision, setSpawnPoint, addExitZone, addNpc } = state;
+        const { activeGameTool, paintCollision } = state;
+        // Collision is paintable via drag; entity tools only fire on initial click
         if (activeGameTool === 'collision') paintCollision(gx, gy, true);
-        else if (activeGameTool === 'spawn') setSpawnPoint(gx, gy);
-        else if (activeGameTool === 'exit') addExitZone(gx, gy, gx, gy);
-        else if (activeGameTool === 'npc') addNpc(gx, gy);
-        else if (activeGameTool === 'action') state.addAction(gx, gy);
+        else if (!isDrag) {
+          if (activeGameTool === 'spawn') state.setSpawnPoint(gx, gy);
+          else if (activeGameTool === 'exit') state.addExitZone(gx, gy, gx, gy);
+          else if (activeGameTool === 'npc') state.addNpc(gx, gy);
+          else if (activeGameTool === 'action') state.addAction(gx, gy);
+        }
         return;
       }
       const { activeTool, paintTile, eraseTile, paintColor, brushStamp, stampBrush } = state;
@@ -433,7 +436,7 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
         if (s.editorMode === 'game' && s.activeGameTool === 'collision' && e.buttons === 2) {
           s.paintCollision(pos.x, pos.y, false);
         } else {
-          applyTool(pos.x, pos.y);
+          applyTool(pos.x, pos.y, true);
         }
       }
       scheduleRender();
