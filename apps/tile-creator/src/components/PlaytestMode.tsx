@@ -38,7 +38,7 @@ export function PlaytestMode({ onClose }: PlaytestModeProps) {
 
   // Block editor keyboard shortcuts while playtest is active
   useEffect(() => {
-    const block = (e: KeyboardEvent) => {
+    const blockDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         stop();
         onClose();
@@ -46,10 +46,22 @@ export function PlaytestMode({ onClose }: PlaytestModeProps) {
       }
       // Allow browser shortcuts (Ctrl/Cmd combos)
       if (e.ctrlKey || e.metaKey) return;
-      e.stopPropagation();
+      // Prevent default browser behavior (arrow scroll, Tab focus switch)
+      e.preventDefault();
+      // Only stop propagation for Tab (would switch editor mode)
+      // Let everything else propagate so InputManager receives WASD/arrows/Space
+      if (e.key === 'Tab') e.stopPropagation();
     };
-    window.addEventListener('keydown', block, true);
-    return () => window.removeEventListener('keydown', block, true);
+    const blockUp = (e: KeyboardEvent) => {
+      // Prevent default on keyup too (some browsers need this for arrows)
+      if (!e.ctrlKey && !e.metaKey) e.preventDefault();
+    };
+    window.addEventListener('keydown', blockDown, true);
+    window.addEventListener('keyup', blockUp, true);
+    return () => {
+      window.removeEventListener('keydown', blockDown, true);
+      window.removeEventListener('keyup', blockUp, true);
+    };
   }, []);
 
   const sceneName = collection?.scenes.find((s) => s.id === state?.sceneId)?.name;
