@@ -86,6 +86,7 @@ export const useEditorStore = create<EditorStore>()(
       animClock: 0,
       animationLibrary: [],
       editingGroupAnimationId: null,
+      brushStamp: null as import('../types/editor.js').BrushStamp | null,
       editorMode: 'art' as import('../types/editor.js').EditorMode,
       activeGameTool: 'collision' as import('../types/editor.js').GameTool,
       showCollisionOverlay: false,
@@ -708,6 +709,39 @@ export const useEditorStore = create<EditorStore>()(
           return { ...g, phases };
         });
         set({ scene: { ...scene, groupAnimations: updatedGroups } });
+      },
+
+      setBrushStamp(brush: import('../types/editor.js').BrushStamp | null) {
+        set({ brushStamp: brush });
+        if (brush) set({ activeTool: 'paint' as Tool });
+      },
+
+      stampBrush(x: number, y: number) {
+        const { scene, activeLayerIndex, brushStamp, tileset } = get();
+        if (!brushStamp) return;
+        const layer = scene.layers[activeLayerIndex];
+        const newData = [...layer.data];
+        const newTransforms = layer.transforms
+          ? [...layer.transforms]
+          : new Array(scene.width * scene.height).fill(0);
+        let changed = false;
+        for (const bt of brushStamp.tiles) {
+          const dx = x + bt.dx;
+          const dy = y + bt.dy;
+          if (dx < 0 || dx >= scene.width || dy < 0 || dy >= scene.height) continue;
+          if (tileset && bt.tileId >= tileset.tileImages.length) continue;
+          const idx = dy * scene.width + dx;
+          if (newData[idx] !== bt.tileId || newTransforms[idx] !== 0) {
+            newData[idx] = bt.tileId;
+            newTransforms[idx] = 0;
+            changed = true;
+          }
+        }
+        if (!changed) return;
+        const newLayer = { ...layer, data: newData, transforms: newTransforms };
+        const newLayers = [...scene.layers];
+        newLayers[activeLayerIndex] = newLayer;
+        set({ scene: { ...scene, layers: newLayers } });
       },
 
       setEditorMode(mode: import('../types/editor.js').EditorMode) {

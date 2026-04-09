@@ -266,10 +266,49 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
         ctx.globalAlpha = 1.0;
       }
 
+      // Brush stamp ghost preview at hover position
+      const { brushStamp } = state;
+      if (brushStamp && activeTool === 'paint' && hover && tileset) {
+        ctx.globalAlpha = 0.5;
+        for (const bt of brushStamp.tiles) {
+          const destX = hover.x + bt.dx;
+          const destY = hover.y + bt.dy;
+          if (destX < 0 || destX >= scene.width || destY < 0 || destY >= scene.height) continue;
+          if (bt.tileId < 0 || bt.tileId >= tileset.tileImages.length) continue;
+          const px = destX * ts * zoom;
+          const py = destY * ts * zoom;
+          const sz = ts * zoom;
+          ctx.drawImage(tileset.tileImages[bt.tileId], px, py, sz, sz);
+        }
+        ctx.globalAlpha = 1.0;
+        // Highlight the brush footprint outline
+        ctx.strokeStyle = '#f9e2af';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 3]);
+        ctx.strokeRect(
+          hover.x * ts * zoom,
+          hover.y * ts * zoom,
+          brushStamp.width * ts * zoom,
+          brushStamp.height * ts * zoom,
+        );
+        ctx.setLineDash([]);
+      }
+
       // Hover highlight
       if (hover && hover.x >= 0 && hover.x < scene.width && hover.y >= 0 && hover.y < scene.height) {
         ctx.fillStyle = HOVER_COLOR;
-        ctx.fillRect(hover.x * ts * zoom, hover.y * ts * zoom, ts * zoom, ts * zoom);
+        if (brushStamp && activeTool === 'paint') {
+          // Highlight all tiles in the brush footprint
+          for (const bt of brushStamp.tiles) {
+            const dx = hover.x + bt.dx;
+            const dy = hover.y + bt.dy;
+            if (dx >= 0 && dx < scene.width && dy >= 0 && dy < scene.height) {
+              ctx.fillRect(dx * ts * zoom, dy * ts * zoom, ts * zoom, ts * zoom);
+            }
+          }
+        } else {
+          ctx.fillRect(hover.x * ts * zoom, hover.y * ts * zoom, ts * zoom, ts * zoom);
+        }
       }
     });
   }, [canvasRef]);
@@ -330,8 +369,11 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
         else if (activeGameTool === 'action') state.addAction(gx, gy);
         return;
       }
-      const { activeTool, paintTile, eraseTile, paintColor } = state;
-      if (activeTool === 'paint') paintTile(gx, gy);
+      const { activeTool, paintTile, eraseTile, paintColor, brushStamp, stampBrush } = state;
+      if (activeTool === 'paint') {
+        if (brushStamp) stampBrush(gx, gy);
+        else paintTile(gx, gy);
+      }
       else if (activeTool === 'erase') eraseTile(gx, gy);
       else if (activeTool === 'colorPaint') paintColor(gx, gy);
     },

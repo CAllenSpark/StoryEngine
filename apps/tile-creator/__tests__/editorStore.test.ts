@@ -26,6 +26,7 @@ function resetStore() {
     animClock: 0,
     animationLibrary: [],
     editingGroupAnimationId: null,
+    brushStamp: null,
     editorMode: 'art',
     activeGameTool: 'collision',
     showCollisionOverlay: false,
@@ -658,6 +659,79 @@ describe('editorStore', () => {
       expect(action!.y).toBe(7);
       expect((action!.properties?.action as any)?.trigger).toBe('interact');
       expect((action!.properties?.action as any)?.steps).toEqual([]);
+    });
+
+    it('setBrushStamp stores brush and activates paint tool', () => {
+      useEditorStore.getState().setActiveTool('erase');
+      useEditorStore.getState().setBrushStamp({
+        width: 2,
+        height: 2,
+        tiles: [
+          { dx: 0, dy: 0, tileId: 0 },
+          { dx: 1, dy: 0, tileId: 1 },
+          { dx: 0, dy: 1, tileId: 2 },
+          { dx: 1, dy: 1, tileId: 3 },
+        ],
+      });
+      expect(useEditorStore.getState().brushStamp).not.toBeNull();
+      expect(useEditorStore.getState().brushStamp!.width).toBe(2);
+      expect(useEditorStore.getState().brushStamp!.tiles).toHaveLength(4);
+      expect(useEditorStore.getState().activeTool).toBe('paint');
+    });
+
+    it('setBrushStamp(null) clears the brush', () => {
+      useEditorStore.getState().setBrushStamp({
+        width: 1, height: 1,
+        tiles: [{ dx: 0, dy: 0, tileId: 5 }],
+      });
+      useEditorStore.getState().setBrushStamp(null);
+      expect(useEditorStore.getState().brushStamp).toBeNull();
+    });
+
+    it('stampBrush places all tiles at relative offsets', () => {
+      useEditorStore.getState().setBrushStamp({
+        width: 2,
+        height: 2,
+        tiles: [
+          { dx: 0, dy: 0, tileId: 10 },
+          { dx: 1, dy: 0, tileId: 11 },
+          { dx: 0, dy: 1, tileId: 20 },
+          { dx: 1, dy: 1, tileId: 21 },
+        ],
+      });
+      useEditorStore.getState().stampBrush(2, 3);
+      const layer = useEditorStore.getState().scene.layers[0];
+      const w = useEditorStore.getState().scene.width;
+      expect(layer.data[3 * w + 2]).toBe(10);
+      expect(layer.data[3 * w + 3]).toBe(11);
+      expect(layer.data[4 * w + 2]).toBe(20);
+      expect(layer.data[4 * w + 3]).toBe(21);
+    });
+
+    it('stampBrush clips tiles that fall outside the scene', () => {
+      const w = useEditorStore.getState().scene.width;
+      const h = useEditorStore.getState().scene.height;
+      useEditorStore.getState().setBrushStamp({
+        width: 2,
+        height: 2,
+        tiles: [
+          { dx: 0, dy: 0, tileId: 5 },
+          { dx: 1, dy: 0, tileId: 6 },
+          { dx: 0, dy: 1, tileId: 7 },
+          { dx: 1, dy: 1, tileId: 8 },
+        ],
+      });
+      // Place at bottom-right corner — only top-left tile should fit
+      useEditorStore.getState().stampBrush(w - 1, h - 1);
+      const layer = useEditorStore.getState().scene.layers[0];
+      expect(layer.data[(h - 1) * w + (w - 1)]).toBe(5);
+    });
+
+    it('stampBrush is no-op when brushStamp is null', () => {
+      const layerBefore = useEditorStore.getState().scene.layers[0].data;
+      useEditorStore.getState().stampBrush(0, 0);
+      const layerAfter = useEditorStore.getState().scene.layers[0].data;
+      expect(layerAfter).toBe(layerBefore);
     });
 
     it('validateScene reports exit without target', () => {

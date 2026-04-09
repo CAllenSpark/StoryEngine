@@ -21,6 +21,7 @@ export function Toolbar() {
   const selectedTileId = useEditorStore((s) => s.selectedTileId);
   const tileset = useEditorStore((s) => s.tileset);
   const hasSelection = useEditorStore((s) => s.selectionBounds !== null || s.clipboard !== null);
+  const brushStamp = useEditorStore((s) => s.brushStamp);
   const setActiveTool = useEditorStore((s) => s.setActiveTool);
   const setZoom = useEditorStore((s) => s.setZoom);
   const setRotation = useEditorStore((s) => s.setRotation);
@@ -73,7 +74,16 @@ export function Toolbar() {
           style={{ width: 28, height: 24, padding: 0, border: '1px solid #45475a', cursor: 'pointer' }}
         />
       )}
-      {paintDisabled && (
+      {brushStamp && activeTool === 'paint' && (
+        <span style={{ fontSize: 11, color: '#f9e2af', display: 'flex', alignItems: 'center', gap: 4 }}>
+          Brush: {brushStamp.width}x{brushStamp.height}
+          <button
+            onClick={() => useEditorStore.getState().setBrushStamp(null)}
+            style={{ fontSize: 9, color: '#f38ba8', padding: '0 4px' }}
+          >clear</button>
+        </span>
+      )}
+      {paintDisabled && !brushStamp && (
         <span style={{ fontSize: 11, color: '#f9e2af' }}>Select a tile first</span>
       )}
       {hasSelection && (

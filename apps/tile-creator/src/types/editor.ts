@@ -24,6 +24,18 @@ export interface Clipboard {
   transforms: number[];
 }
 
+export interface BrushTile {
+  dx: number;
+  dy: number;
+  tileId: number;
+}
+
+export interface BrushStamp {
+  width: number;
+  height: number;
+  tiles: BrushTile[];
+}
+
 export interface StoredAnimation {
   id: string;
   name: string;
@@ -70,6 +82,7 @@ export interface EditorState {
   animClock: number;
   animationLibrary: StoredAnimation[];
   editingGroupAnimationId: string | null;
+  brushStamp: BrushStamp | null;
   editorMode: EditorMode;
   activeGameTool: GameTool;
   showCollisionOverlay: boolean;
@@ -132,6 +145,8 @@ export interface EditorActions {
   updateGroupAnimation: (id: string, phases: GroupAnimationPhase[]) => void;
   removeGroupAnimation: (id: string) => void;
   captureGroupFrame: (groupId: string) => void;
+  setBrushStamp: (brush: BrushStamp | null) => void;
+  stampBrush: (x: number, y: number) => void;
   setEditorMode: (mode: EditorMode) => void;
   setActiveGameTool: (tool: GameTool) => void;
   toggleCollisionOverlay: () => void;
