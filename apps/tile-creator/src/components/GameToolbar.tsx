@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
+import { PlaytestMode } from './PlaytestMode.js';
 import type { GameTool, ValidationMessage } from '../types/editor.js';
 
 const GAME_TOOL_LABELS: Record<GameTool, string> = {
@@ -18,6 +19,8 @@ export function GameToolbar() {
   const toggleCollisionOverlay = useEditorStore((s) => s.toggleCollisionOverlay);
   const setZoom = useEditorStore((s) => s.setZoom);
   const [validationMessages, setValidationMessages] = useState<ValidationMessage[]>([]);
+  const [showPlaytest, setShowPlaytest] = useState(false);
+  const hasCollection = useEditorStore((s) => (s.currentCollection?.scenes.length ?? 0) > 0);
 
   const handleValidate = () => {
     const msgs = useEditorStore.getState().validateScene();
@@ -56,6 +59,14 @@ export function GameToolbar() {
         <button onClick={handleValidate}>
           Validate
         </button>
+        <button
+          className={showPlaytest ? 'active' : ''}
+          onClick={() => setShowPlaytest(true)}
+          disabled={!hasCollection}
+          style={{ background: hasCollection ? '#a6e3a1' : undefined, color: hasCollection ? '#1e1e2e' : undefined, fontWeight: 600 }}
+        >
+          Playtest
+        </button>
         <span style={{ marginLeft: 'auto', fontSize: 12 }}>Zoom:</span>
         <button onClick={() => setZoom(zoom - 1)}>-</button>
         <span style={{ fontSize: 12, minWidth: 24, textAlign: 'center' }}>{zoom}x</span>
@@ -86,6 +97,10 @@ export function GameToolbar() {
             </span>
           ))}
         </div>
+      )}
+
+      {showPlaytest && (
+        <PlaytestMode onClose={() => setShowPlaytest(false)} />
       )}
     </div>
   );
