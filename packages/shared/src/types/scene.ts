@@ -88,6 +88,8 @@ export interface ActionDef {
   condition?: { flag?: string; item?: string };
   steps: ActionStep[];
   oneShot?: boolean;
+  /** Trigger radius in tiles (0 = same tile only, 1 = adjacent, etc.) */
+  radius?: number;
 }
 
 export interface DialogueLine {

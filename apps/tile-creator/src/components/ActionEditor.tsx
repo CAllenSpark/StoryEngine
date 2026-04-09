@@ -134,6 +134,28 @@ export function ActionEditor({ entityId, onClose }: ActionEditorProps) {
           </div>
         )}
 
+        {/* Radius */}
+        {(action.trigger === 'interact' || action.trigger === 'step') && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 600 }}>Radius:</span>
+            <input
+              type="number"
+              min={0}
+              max={10}
+              value={action.radius ?? 0}
+              onChange={(e) => updateAction({ radius: Number(e.target.value) })}
+              style={{
+                width: 45, background: '#313244', color: '#cdd6f4',
+                border: '1px solid #45475a', borderRadius: 3,
+                padding: '1px 4px', fontSize: 11,
+              }}
+            />
+            <span style={{ fontSize: 10, color: '#6c7086' }}>
+              0 = same tile, 1 = adjacent, 2+ = wider area
+            </span>
+          </div>
+        )}
+
         {/* One-shot */}
         <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
           <input

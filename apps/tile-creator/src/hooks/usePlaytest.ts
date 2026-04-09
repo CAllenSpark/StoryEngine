@@ -3,6 +3,18 @@ import { GameLoop, InputManager, Tilemap, loadTilemap } from '@storyengine/engin
 import type { SceneJSON, EntityDef, DialogueLine, ActionDef } from '@storyengine/shared';
 import { decodeTransform } from '../lib/transformUtils.js';
 
+export interface MediaOverlay {
+  type: 'video' | 'audio' | 'image' | 'slideshow' | 'playerInput';
+  url?: string;
+  urls?: string[];
+  loop?: boolean;
+  duration?: number;
+  interval?: number;
+  prompt?: string;
+  options?: string[];
+  startedAt: number;
+}
+
 export interface PlaytestState {
   /** Player position in pixels */
   px: number;
@@ -21,6 +33,12 @@ export interface PlaytestState {
   firedActions: Set<string>;
   /** Player state flags (from changePlayerState actions) */
   flags: Record<string, unknown>;
+  /** Active media overlay (video, image, slideshow, etc.) */
+  media: MediaOverlay | null;
+  /** Active audio (plays in background, doesn't block movement) */
+  audio: { url: string; loop: boolean } | null;
+  /** Last playerInput choice */
+  lastChoice: string | null;
 }
 
 interface PlaytestConfig {
@@ -34,13 +52,13 @@ interface PlaytestConfig {
 }
 
 const PLAYER_SPEED = 80; // pixels per second
-const INTERACT_RANGE = 1.2; // tiles distance for interaction
 
 export function usePlaytest(config: PlaytestConfig) {
   const stateRef = useRef<PlaytestState>({
     px: 0, py: 0, facing: 'down',
     sceneId: '', dialogue: null, dialogueIndex: 0,
     running: false, firedActions: new Set(), flags: {},
+    media: null, audio: null, lastChoice: null,
   });
   const tilemapRef = useRef<Tilemap | null>(null);
   const sceneRef = useRef<SceneJSON | null>(null);
@@ -71,6 +89,7 @@ export function usePlaytest(config: PlaytestConfig) {
     stateRef.current.py = sy * scene.tileSize + scene.tileSize / 2;
     stateRef.current.dialogue = null;
     stateRef.current.dialogueIndex = 0;
+    stateRef.current.media = null;
 
     // Fire auto-trigger actions
     const entities = scene.entities ?? [];
@@ -90,7 +109,7 @@ export function usePlaytest(config: PlaytestConfig) {
       stateRef.current.firedActions.add(entity.id);
     }
 
-    // Process steps — for now, handle dialogue, changeScene, changePlayerState
+    // Process steps sequentially — blocking overlays pause further steps
     for (const step of action.steps) {
       switch (step.type) {
         case 'showDialogue': {
@@ -106,7 +125,6 @@ export function usePlaytest(config: PlaytestConfig) {
           const sx = (step.params.spawnX as number) ?? 0;
           const sy = (step.params.spawnY as number) ?? 0;
           if (targetSceneId) {
-            // Defer scene load to next frame to avoid mutation during iteration
             setTimeout(() => loadScene(targetSceneId, sx, sy), 0);
           }
           return; // Stop processing further steps after scene change
@@ -117,28 +135,108 @@ export function usePlaytest(config: PlaytestConfig) {
           if (flag) stateRef.current.flags[flag] = value;
           break;
         }
+        case 'playVideo': {
+          stateRef.current.media = {
+            type: 'video',
+            url: step.params.url as string,
+            startedAt: Date.now(),
+          };
+          break;
+        }
+        case 'playAudio': {
+          stateRef.current.audio = {
+            url: step.params.url as string,
+            loop: (step.params.loop as boolean) ?? false,
+          };
+          break;
+        }
+        case 'stopAudio': {
+          stateRef.current.audio = null;
+          break;
+        }
+        case 'showImage': {
+          stateRef.current.media = {
+            type: 'image',
+            url: step.params.url as string,
+            duration: (step.params.duration as number) ?? 3000,
+            startedAt: Date.now(),
+          };
+          break;
+        }
+        case 'showSlideshow': {
+          stateRef.current.media = {
+            type: 'slideshow',
+            urls: (step.params.images as string[]) ?? [],
+            interval: (step.params.interval as number) ?? 2000,
+            startedAt: Date.now(),
+          };
+          break;
+        }
+        case 'playerInput': {
+          stateRef.current.media = {
+            type: 'playerInput',
+            prompt: (step.params.prompt as string) ?? 'What do you do?',
+            options: (step.params.options as string[]) ?? [],
+            startedAt: Date.now(),
+          };
+          break;
+        }
+        case 'playGroupAnimation': {
+          // Group animations play automatically via tilemap — no runtime action needed
+          break;
+        }
+        case 'playActorAnimation': {
+          // Stub — would animate an NPC/actor sprite
+          break;
+        }
       }
     }
     notify();
   }, [loadScene, notify]);
 
-  const findNearbyEntity = useCallback((type: string): EntityDef | null => {
+  const findNearbyEntity = useCallback((type: string, maxRadius?: number): EntityDef | null => {
     const scene = sceneRef.current;
     if (!scene) return null;
     const ts = scene.tileSize;
     const playerTileX = Math.floor(stateRef.current.px / ts);
     const playerTileY = Math.floor(stateRef.current.py / ts);
 
+    let best: EntityDef | null = null;
+    let bestDist = Infinity;
     for (const ent of scene.entities ?? []) {
       if (ent.type !== type) continue;
+      // Per-entity radius: action entities use their ActionDef radius, others use 0 (same tile)
+      let radius = 0;
+      if (ent.type === 'action') {
+        const action = ent.properties?.action as ActionDef | undefined;
+        radius = action?.radius ?? 0;
+      } else if (ent.type === 'npc') {
+        radius = 1; // NPCs: interact when adjacent
+      }
+      if (maxRadius !== undefined) radius = Math.min(radius, maxRadius);
       const dx = Math.abs(ent.x - playerTileX);
       const dy = Math.abs(ent.y - playerTileY);
-      if (dx <= INTERACT_RANGE && dy <= INTERACT_RANGE) return ent;
+      const dist = Math.max(dx, dy); // Chebyshev distance
+      if (dist <= radius && dist < bestDist) {
+        best = ent;
+        bestDist = dist;
+      }
     }
-    return null;
+    return best;
   }, []);
 
+  const dismissOverlay = useCallback(() => {
+    stateRef.current.media = null;
+    notify();
+  }, [notify]);
+
   const handleInteract = useCallback(() => {
+    // If media overlay is active, dismiss it
+    if (stateRef.current.media) {
+      dismissOverlay();
+      return;
+    }
+
     // If dialogue is active, advance it
     if (stateRef.current.dialogue) {
       stateRef.current.dialogueIndex++;
@@ -168,11 +266,9 @@ export function usePlaytest(config: PlaytestConfig) {
       const action = actionEntity.properties?.action as ActionDef | undefined;
       if (!action || action.trigger !== 'interact') return;
       if (action.oneShot && stateRef.current.firedActions.has(actionEntity.id)) return;
-      if (action.trigger === 'interact' || (action.condition?.flag && stateRef.current.flags[action.condition.flag])) {
-        executeAction(actionEntity, action);
-      }
+      executeAction(actionEntity, action);
     }
-  }, [findNearbyEntity, executeAction, notify]);
+  }, [findNearbyEntity, executeAction, dismissOverlay, notify]);
 
   // Start playtest
   const start = useCallback(() => {
@@ -193,10 +289,22 @@ export function usePlaytest(config: PlaytestConfig) {
         const input = inputRef.current;
         if (!tilemap || !scene || !input) return;
 
-        // Don't move while dialogue is active
-        if (s.dialogue) {
+        // Don't move while dialogue or media overlay is active
+        if (s.dialogue || s.media) {
           if (input.isJustPressed('Space') || input.isJustPressed('Enter') || input.isJustPressed('KeyE')) {
             handleInteract();
+          }
+          // playerInput: number keys select options
+          if (s.media?.type === 'playerInput' && s.media.options) {
+            for (let i = 0; i < s.media.options.length; i++) {
+              if (input.isJustPressed(`Digit${i + 1}`)) {
+                s.lastChoice = s.media.options[i];
+                s.flags[`lastChoice`] = s.media.options[i];
+                s.media = null;
+                notify();
+                break;
+              }
+            }
           }
           input.endFrame();
           return;
@@ -427,6 +535,8 @@ export function usePlaytest(config: PlaytestConfig) {
     inputRef.current = null;
     stateRef.current.running = false;
     stateRef.current.dialogue = null;
+    stateRef.current.media = null;
+    stateRef.current.audio = null;
     notify();
   }, [notify]);
 
