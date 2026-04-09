@@ -180,7 +180,7 @@ export function PlaytestMode({ onClose }: PlaytestModeProps) {
               autoPlay
               controls
               style={{ maxWidth: '80vw', maxHeight: '70vh', borderRadius: 8 }}
-              onEnded={() => useEditorStore.getState() /* dismiss handled by interact */}
+              onEnded={() => { /* video ends — press Space to dismiss overlay */ }}
             />
           ) : (
             <div style={mediaPlaceholderStyle}>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { GameLoop, InputManager, Tilemap, loadTilemap } from '@storyengine/engine';
+import { GameLoop, InputManager, loadTilemap } from '@storyengine/engine';
 import type { SceneJSON, EntityDef, DialogueLine, ActionDef } from '@storyengine/shared';
 import { decodeTransform } from '../lib/transformUtils.js';
 
@@ -125,6 +125,7 @@ export function usePlaytest(config: PlaytestConfig) {
           const sx = (step.params.spawnX as number) ?? 0;
           const sy = (step.params.spawnY as number) ?? 0;
           if (targetSceneId) {
+            // Defer to next microtask — avoids mutating scene state mid-iteration
             setTimeout(() => loadScene(targetSceneId, sx, sy), 0);
           }
           return; // Stop processing further steps after scene change

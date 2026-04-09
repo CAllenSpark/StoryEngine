@@ -163,7 +163,7 @@ export function TilesetPanel() {
     [tileAtMouse],
   );
 
-  const handlePaletteMouseMove2 = useCallback(
+  const handlePaletteMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       // Update hover
       const hit = tileAtMouse(e);
@@ -226,18 +226,10 @@ export function TilesetPanel() {
   const handlePaletteContextMenu = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       e.preventDefault();
-      if (!tileset || columns === 0) return;
-      const rect = e.currentTarget.getBoundingClientRect();
-      const scaleX = e.currentTarget.width / rect.width;
-      const scaleY = e.currentTarget.height / rect.height;
-      const x = Math.floor(((e.clientX - rect.left) * scaleX) / (tileSize * PALETTE_SCALE));
-      const y = Math.floor(((e.clientY - rect.top) * scaleY) / (tileSize * PALETTE_SCALE));
-      const id = y * columns + x;
-      if (id >= 0 && id < tileCount) {
-        setAnimDialogTileId(id);
-      }
+      const hit = tileAtMouse(e);
+      if (hit) setAnimDialogTileId(hit.id);
     },
-    [tileset, tileSize, columns, tileCount],
+    [tileAtMouse],
   );
 
   useEffect(() => {
@@ -283,7 +275,7 @@ export function TilesetPanel() {
           <canvas
             ref={canvasRef}
             onMouseDown={handlePaletteMouseDown}
-            onMouseMove={handlePaletteMouseMove2}
+            onMouseMove={handlePaletteMouseMove}
             onMouseUp={handlePaletteMouseUp}
             onMouseLeave={() => {
               setHoveredTileId(-1);

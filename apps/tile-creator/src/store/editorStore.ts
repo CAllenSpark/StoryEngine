@@ -9,6 +9,11 @@ import { createCollectionActions } from './collectionActions.js';
 import { encodeTransform, decodeTransform } from '../lib/transformUtils.js';
 import { logger } from '../logger.js';
 
+/** Clone or create a transforms array for immutable layer updates. */
+function cloneTransforms(layer: TileLayer, size: number): number[] {
+  return layer.transforms ? [...layer.transforms] : new Array(size).fill(0);
+}
+
 async function restoreTilesetFromStored(
   stored: StoredTileset,
 ): Promise<TilesetState> {
@@ -104,9 +109,7 @@ export const useEditorStore = create<EditorStore>()(
 
         const newData = [...layer.data];
         newData[idx] = selectedTileId;
-        const newTransforms = layer.transforms
-          ? [...layer.transforms]
-          : new Array(scene.width * scene.height).fill(0);
+        const newTransforms = cloneTransforms(layer, scene.width * scene.height);
         newTransforms[idx] = newTransformVal;
         const newLayer = { ...layer, data: newData, transforms: newTransforms };
         const newLayers = [...scene.layers];
@@ -123,9 +126,7 @@ export const useEditorStore = create<EditorStore>()(
 
         const newData = [...layer.data];
         newData[idx] = -1;
-        const newTransforms = layer.transforms
-          ? [...layer.transforms]
-          : new Array(scene.width * scene.height).fill(0);
+        const newTransforms = cloneTransforms(layer, scene.width * scene.height);
         newTransforms[idx] = 0;
         const newLayer = { ...layer, data: newData, transforms: newTransforms };
         const newLayers = [...scene.layers];
@@ -139,9 +140,7 @@ export const useEditorStore = create<EditorStore>()(
         const { x1, y1, x2, y2 } = selectionBounds;
         const layer = scene.layers[activeLayerIndex];
         const newData = [...layer.data];
-        const newTransforms = layer.transforms
-          ? [...layer.transforms]
-          : new Array(scene.width * scene.height).fill(0);
+        const newTransforms = cloneTransforms(layer, scene.width * scene.height);
         for (let y = y1; y <= y2; y++) {
           for (let x = x1; x <= x2; x++) {
             const idx = y * scene.width + x;
@@ -465,9 +464,7 @@ export const useEditorStore = create<EditorStore>()(
         if (!clipboard) return;
         const layer = scene.layers[activeLayerIndex];
         const newData = [...layer.data];
-        const newTransforms = layer.transforms
-          ? [...layer.transforms]
-          : new Array(scene.width * scene.height).fill(0);
+        const newTransforms = cloneTransforms(layer, scene.width * scene.height);
         for (let cy = 0; cy < clipboard.height; cy++) {
           for (let cx = 0; cx < clipboard.width; cx++) {
             const sx = destX + cx;
@@ -738,9 +735,7 @@ export const useEditorStore = create<EditorStore>()(
         if (!brushStamp) return;
         const layer = scene.layers[activeLayerIndex];
         const newData = [...layer.data];
-        const newTransforms = layer.transforms
-          ? [...layer.transforms]
-          : new Array(scene.width * scene.height).fill(0);
+        const newTransforms = cloneTransforms(layer, scene.width * scene.height);
         let changed = false;
         for (const bt of brushStamp.tiles) {
           const dx = x + bt.dx;
@@ -911,7 +906,7 @@ export const useEditorStore = create<EditorStore>()(
           if (layer.data[idx] === existingIdx && (layer.transforms?.[idx] ?? 0) === transformVal) return;
           const newData = [...layer.data];
           newData[idx] = existingIdx;
-          const newTransforms = layer.transforms ? [...layer.transforms] : new Array(scene.width * scene.height).fill(0);
+          const newTransforms = cloneTransforms(layer, scene.width * scene.height);
           newTransforms[idx] = transformVal;
           const newLayer = { ...layer, data: newData, transforms: newTransforms };
           const newLayers = [...scene.layers];
@@ -946,7 +941,7 @@ export const useEditorStore = create<EditorStore>()(
         const newData = [...layer.data];
         newData[idx] = newTileIdx;
         const transformVal = encodeTransform(currentRotation, currentFlipH, currentFlipV);
-        const newTransforms = layer.transforms ? [...layer.transforms] : new Array(scene.width * scene.height).fill(0);
+        const newTransforms = cloneTransforms(layer, scene.width * scene.height);
         newTransforms[idx] = transformVal;
         const newLayer = { ...layer, data: newData, transforms: newTransforms };
         const newLayers = [...scene.layers];

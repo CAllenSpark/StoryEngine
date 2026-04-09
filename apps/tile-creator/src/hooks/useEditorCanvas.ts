@@ -30,6 +30,9 @@ function resolveGroupFrame(
 
 const GRID_COLOR = '#45475a';
 const HOVER_COLOR = 'rgba(137, 180, 250, 0.3)';
+// Overlay key encoding: x + y * MAX_MAP_DIM + layer * MAX_MAP_DIM^2
+// Matches the engine's Tilemap.overlayKey() — max map dimension 1024.
+const MAX_MAP_DIM = 1024;
 const PLACEHOLDER_COLORS = [
   '#a6e3a1', '#89b4fa', '#f9e2af', '#f38ba8', '#cba6f7',
   '#94e2d5', '#fab387', '#74c7ec', '#f2cdcd', '#b4befe',
@@ -83,7 +86,7 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
           for (let gx = 0; gx < group.width; gx++) {
             const tid = frame.tiles[gy * group.width + gx];
             if (tid !== undefined && tid >= 0) {
-              groupOverlay.set((group.x + gx) + (group.y + gy) * 1024 + group.layer * 1048576, tid);
+              groupOverlay.set((group.x + gx) + (group.y + gy) * MAX_MAP_DIM + group.layer * MAX_MAP_DIM * MAX_MAP_DIM, tid);
             }
           }
         }
@@ -99,7 +102,7 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
             const dataIdx = y * scene.width + x;
             const rawTileId = layer.data[dataIdx];
             // Check group overlay first
-            const groupTile = groupOverlay.get(x + y * 1024 + li * 1048576);
+            const groupTile = groupOverlay.get(x + y * MAX_MAP_DIM + li * MAX_MAP_DIM * MAX_MAP_DIM);
             const baseTile = groupTile !== undefined ? groupTile : rawTileId;
             if (baseTile < 0) continue;
             const tileId = groupTile !== undefined

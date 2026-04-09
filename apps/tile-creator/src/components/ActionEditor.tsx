@@ -28,8 +28,12 @@ const ACTION_TYPE_LABELS: Record<ActionType, string> = {
   playActorAnimation: 'Play Actor Animation',
 };
 
-const IMPLEMENTED_ACTIONS: ActionType[] = ['showDialogue', 'playGroupAnimation', 'changeScene'];
-const STUB_ACTIONS: ActionType[] = ['playVideo', 'playAudio', 'stopAudio', 'showImage', 'showSlideshow', 'playerInput', 'changePlayerState', 'playActorAnimation'];
+const IMPLEMENTED_ACTIONS: ActionType[] = [
+  'showDialogue', 'playGroupAnimation', 'changeScene',
+  'playVideo', 'playAudio', 'stopAudio', 'showImage',
+  'showSlideshow', 'playerInput', 'changePlayerState',
+];
+const STUB_ACTIONS: ActionType[] = ['playActorAnimation'];
 
 export function ActionEditor({ entityId, onClose }: ActionEditorProps) {
   const scene = useEditorStore((s) => s.scene);
