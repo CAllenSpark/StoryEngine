@@ -34,7 +34,6 @@ interface PlaytestConfig {
 }
 
 const PLAYER_SPEED = 80; // pixels per second
-const PLAYER_SIZE = 12; // player rect size in pixels
 const INTERACT_RANGE = 1.2; // tiles distance for interaction
 
 export function usePlaytest(config: PlaytestConfig) {
@@ -218,20 +217,20 @@ export function usePlaytest(config: PlaytestConfig) {
           const newPy = s.py + move.y * PLAYER_SPEED * dtSec;
 
           // Collision check — check each axis separately for sliding
-          const halfSize = PLAYER_SIZE / 2;
+          const halfTs = ts / 2;
 
           // Check X axis
           const testTileX = Math.floor(newPx / ts);
           const testTileYCur = Math.floor(s.py / ts);
           if (tilemap.isWalkable(testTileX, testTileYCur)) {
-            s.px = Math.max(halfSize, Math.min(tilemap.pixelWidth - halfSize, newPx));
+            s.px = Math.max(halfTs, Math.min(tilemap.pixelWidth - halfTs, newPx));
           }
 
           // Check Y axis
           const testTileXCur = Math.floor(s.px / ts);
           const testTileY = Math.floor(newPy / ts);
           if (tilemap.isWalkable(testTileXCur, testTileY)) {
-            s.py = Math.max(halfSize, Math.min(tilemap.pixelHeight - halfSize, newPy));
+            s.py = Math.max(halfTs, Math.min(tilemap.pixelHeight - halfTs, newPy));
           }
 
           // Update facing
@@ -346,29 +345,73 @@ export function usePlaytest(config: PlaytestConfig) {
           ctx.stroke();
         }
 
-        // Draw player
+        // Draw player — tile-sized character with strong visibility
         const playerPx = s.px * scale;
         const playerPy = s.py * scale;
-        const pSize = PLAYER_SIZE * scale;
+        const pSize = ts * scale; // Full tile size
+        const pHalf = pSize / 2;
 
+        // Drop shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.beginPath();
+        ctx.ellipse(playerPx, playerPy + pHalf - 2 * scale, pHalf * 0.7, pHalf * 0.25, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Body
+        const bodyX = playerPx - pHalf * 0.7;
+        const bodyY = playerPy - pHalf * 0.8;
+        const bodyW = pSize * 0.7;
+        const bodyH = pSize * 0.9;
         ctx.fillStyle = '#a6e3a1';
-        ctx.fillRect(
-          playerPx - pSize / 2,
-          playerPy - pSize / 2,
-          pSize,
-          pSize,
-        );
+        ctx.beginPath();
+        ctx.roundRect(bodyX, bodyY, bodyW, bodyH, 3 * scale);
+        ctx.fill();
 
-        // Facing indicator
+        // Outline
+        ctx.strokeStyle = '#1e1e2e';
+        ctx.lineWidth = 2 * scale;
+        ctx.beginPath();
+        ctx.roundRect(bodyX, bodyY, bodyW, bodyH, 3 * scale);
+        ctx.stroke();
+
+        // Facing indicator (eyes)
         ctx.fillStyle = '#1e1e2e';
-        const dotSize = 3 * scale;
-        let dotX = playerPx;
-        let dotY = playerPy;
-        if (s.facing === 'down') dotY += pSize / 2 - dotSize;
-        else if (s.facing === 'up') dotY -= pSize / 2;
-        else if (s.facing === 'left') dotX -= pSize / 2;
-        else dotX += pSize / 2 - dotSize;
-        ctx.fillRect(dotX - dotSize / 2, dotY - dotSize / 2, dotSize, dotSize);
+        const eyeSize = 2 * scale;
+        const eyeY = bodyY + bodyH * 0.3;
+        if (s.facing === 'down' || s.facing === 'up') {
+          ctx.fillRect(playerPx - eyeSize * 2, eyeY, eyeSize, eyeSize);
+          ctx.fillRect(playerPx + eyeSize, eyeY, eyeSize, eyeSize);
+        } else if (s.facing === 'left') {
+          ctx.fillRect(bodyX + eyeSize, eyeY, eyeSize, eyeSize);
+          ctx.fillRect(bodyX + eyeSize, eyeY + eyeSize * 2, eyeSize * 3, eyeSize * 0.5);
+        } else {
+          ctx.fillRect(bodyX + bodyW - eyeSize * 2, eyeY, eyeSize, eyeSize);
+          ctx.fillRect(bodyX + bodyW - eyeSize * 4, eyeY + eyeSize * 2, eyeSize * 3, eyeSize * 0.5);
+        }
+
+        // Direction arrow above player
+        ctx.fillStyle = 'rgba(166, 227, 161, 0.9)';
+        const arrowY = bodyY - 4 * scale;
+        ctx.beginPath();
+        if (s.facing === 'down') {
+          ctx.moveTo(playerPx, arrowY + 3 * scale);
+          ctx.lineTo(playerPx - 3 * scale, arrowY);
+          ctx.lineTo(playerPx + 3 * scale, arrowY);
+        } else if (s.facing === 'up') {
+          ctx.moveTo(playerPx, arrowY);
+          ctx.lineTo(playerPx - 3 * scale, arrowY + 3 * scale);
+          ctx.lineTo(playerPx + 3 * scale, arrowY + 3 * scale);
+        } else if (s.facing === 'left') {
+          ctx.moveTo(playerPx - 3 * scale, arrowY + 1.5 * scale);
+          ctx.lineTo(playerPx, arrowY);
+          ctx.lineTo(playerPx, arrowY + 3 * scale);
+        } else {
+          ctx.moveTo(playerPx + 3 * scale, arrowY + 1.5 * scale);
+          ctx.lineTo(playerPx, arrowY);
+          ctx.lineTo(playerPx, arrowY + 3 * scale);
+        }
+        ctx.closePath();
+        ctx.fill();
       },
     });
 

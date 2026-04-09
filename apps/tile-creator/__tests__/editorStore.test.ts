@@ -26,6 +26,7 @@ function resetStore() {
     animClock: 0,
     animationLibrary: [],
     editingGroupAnimationId: null,
+    selectedEntityId: null,
     brushStamp: null,
     editorMode: 'art',
     activeGameTool: 'collision',
@@ -675,6 +676,17 @@ describe('editorStore', () => {
       expect(action!.y).toBe(7);
       expect((action!.properties?.action as any)?.trigger).toBe('interact');
       expect((action!.properties?.action as any)?.steps).toEqual([]);
+    });
+
+    it('selectEntityAt selects entity at tile position', () => {
+      useEditorStore.getState().addNpc(3, 5);
+      useEditorStore.getState().addExitZone(7, 2, 7, 2);
+      useEditorStore.getState().selectEntityAt(3, 5);
+      const npc = useEditorStore.getState().scene.entities!.find((e) => e.type === 'npc');
+      expect(useEditorStore.getState().selectedEntityId).toBe(npc!.id);
+      // Select empty tile
+      useEditorStore.getState().selectEntityAt(0, 0);
+      expect(useEditorStore.getState().selectedEntityId).toBeNull();
     });
 
     it('setBrushStamp stores brush and activates paint tool', () => {

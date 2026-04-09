@@ -82,6 +82,7 @@ export interface EditorState {
   animClock: number;
   animationLibrary: StoredAnimation[];
   editingGroupAnimationId: string | null;
+  selectedEntityId: string | null;
   brushStamp: BrushStamp | null;
   editorMode: EditorMode;
   activeGameTool: GameTool;
@@ -145,6 +146,8 @@ export interface EditorActions {
   updateGroupAnimation: (id: string, phases: GroupAnimationPhase[]) => void;
   removeGroupAnimation: (id: string) => void;
   captureGroupFrame: (groupId: string) => void;
+  selectEntityAt: (x: number, y: number) => void;
+  setSelectedEntityId: (id: string | null) => void;
   setBrushStamp: (brush: BrushStamp | null) => void;
   stampBrush: (x: number, y: number) => void;
   setEditorMode: (mode: EditorMode) => void;

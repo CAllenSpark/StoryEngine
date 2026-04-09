@@ -220,6 +220,23 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
         }
       }
 
+      // Selected entity highlight
+      const { selectedEntityId } = state;
+      if (selectedEntityId) {
+        const selEnt = entities.find((e) => e.id === selectedEntityId);
+        if (selEnt) {
+          const sx = selEnt.x * ts * zoom;
+          const sy = selEnt.y * ts * zoom;
+          const sw = (selEnt.width ?? 1) * ts * zoom;
+          const sh = (selEnt.height ?? 1) * ts * zoom;
+          ctx.strokeStyle = '#cdd6f4';
+          ctx.lineWidth = 3;
+          ctx.setLineDash([5, 3]);
+          ctx.strokeRect(sx - 1, sy - 1, sw + 2, sh + 2);
+          ctx.setLineDash([]);
+        }
+      }
+
       // Selection rectangle overlay
       if (selectionBounds) {
         const sx = selectionBounds.x1 * ts * zoom;
@@ -391,8 +408,11 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
       const pos = toGrid(e);
       if (!pos) return;
 
-      // Game mode: right-click erases collision
+      // Game mode: select entity at clicked tile + tool action
       const state = useEditorStore.getState();
+      if (state.editorMode === 'game') {
+        state.selectEntityAt(pos.x, pos.y);
+      }
       if (state.editorMode === 'game' && state.activeGameTool === 'collision') {
         if (e.button === 0) {
           isPaintingRef.current = true;

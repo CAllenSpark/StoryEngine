@@ -1,18 +1,33 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
 import { ActionEditor } from './ActionEditor.js';
 import { NpcEditor } from './NpcEditor.js';
 import type { ValidationMessage } from '../types/editor.js';
 import type { ActionDef, DialogueLine } from '@storyengine/shared';
 
+const SELECTED_STYLE = {
+  background: 'rgba(137, 180, 250, 0.15)',
+  borderLeft: '2px solid #89b4fa',
+  paddingLeft: 4,
+} as const;
+
 export function EntityPanel() {
   const scene = useEditorStore((s) => s.scene);
   const collection = useEditorStore((s) => s.currentCollection);
+  const selectedEntityId = useEditorStore((s) => s.selectedEntityId);
   const entities = scene.entities ?? [];
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingNpcId, setEditingNpcId] = useState<string | null>(null);
   const [editingActionId, setEditingActionId] = useState<string | null>(null);
   const [collectionErrors, setCollectionErrors] = useState<ValidationMessage[]>([]);
+  const selectedRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to selected entity
+  useEffect(() => {
+    if (selectedEntityId && selectedRef.current) {
+      selectedRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [selectedEntityId]);
 
   const spawns = entities.filter((e) => e.type === 'spawn');
   const exits = entities.filter((e) => e.type === 'exit');
@@ -110,10 +125,19 @@ export function EntityPanel() {
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#a6e3a1' }}>Spawn</div>
           {spawns.map((s) => (
-            <div key={s.id} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, padding: '1px 0' }}>
+            <div
+              key={s.id}
+              ref={selectedEntityId === s.id ? selectedRef : undefined}
+              onClick={() => useEditorStore.getState().setSelectedEntityId(s.id)}
+              style={{
+                fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0',
+                cursor: 'pointer', borderRadius: 3,
+                ...(selectedEntityId === s.id ? SELECTED_STYLE : {}),
+              }}
+            >
               <span>({s.x}, {s.y})</span>
               <button
-                onClick={() => useEditorStore.getState().removeEntity(s.id)}
+                onClick={(e) => { e.stopPropagation(); useEditorStore.getState().removeEntity(s.id); }}
                 style={{ fontSize: 9, color: '#f38ba8', padding: '0 3px', marginLeft: 'auto' }}
               >x</button>
             </div>
@@ -129,7 +153,16 @@ export function EntityPanel() {
             const targetId = exit.properties?.targetSceneId as string | undefined;
             const targetName = collection?.scenes.find((s) => s.id === targetId)?.name;
             return (
-              <div key={exit.id} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', flexWrap: 'wrap' }}>
+              <div
+                key={exit.id}
+                ref={selectedEntityId === exit.id ? selectedRef : undefined}
+                onClick={() => useEditorStore.getState().setSelectedEntityId(exit.id)}
+                style={{
+                  fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0',
+                  flexWrap: 'wrap', cursor: 'pointer', borderRadius: 3,
+                  ...(selectedEntityId === exit.id ? SELECTED_STYLE : {}),
+                }}
+              >
                 <span>({exit.x},{exit.y})</span>
                 {editingId === exit.id ? (
                   <select
@@ -159,7 +192,7 @@ export function EntityPanel() {
                   </button>
                 )}
                 <button
-                  onClick={() => useEditorStore.getState().removeEntity(exit.id)}
+                  onClick={(e) => { e.stopPropagation(); useEditorStore.getState().removeEntity(exit.id); }}
                   style={{ fontSize: 9, color: '#f38ba8', padding: '0 3px', marginLeft: 'auto' }}
                 >x</button>
               </div>
@@ -175,7 +208,16 @@ export function EntityPanel() {
           {npcs.map((npc) => {
             const dialogue = (npc.properties?.dialogue as DialogueLine[]) ?? [];
             return (
-              <div key={npc.id} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, padding: '1px 0' }}>
+              <div
+                key={npc.id}
+                ref={selectedEntityId === npc.id ? selectedRef : undefined}
+                onClick={() => useEditorStore.getState().setSelectedEntityId(npc.id)}
+                style={{
+                  fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0',
+                  cursor: 'pointer', borderRadius: 3,
+                  ...(selectedEntityId === npc.id ? SELECTED_STYLE : {}),
+                }}
+              >
                 <span>{(npc.properties?.name as string) ?? 'NPC'} ({npc.x},{npc.y})</span>
                 <span style={{ color: '#6c7086' }}>
                   {dialogue.length} line{dialogue.length !== 1 ? 's' : ''}
@@ -185,7 +227,7 @@ export function EntityPanel() {
                   style={{ fontSize: 9, padding: '0 4px', color: '#f9e2af' }}
                 >edit</button>
                 <button
-                  onClick={() => useEditorStore.getState().removeEntity(npc.id)}
+                  onClick={(e) => { e.stopPropagation(); useEditorStore.getState().removeEntity(npc.id); }}
                   style={{ fontSize: 9, color: '#f38ba8', padding: '0 3px', marginLeft: 'auto' }}
                 >x</button>
               </div>
@@ -210,7 +252,16 @@ export function EntityPanel() {
             const stepCount = actionDef?.steps?.length ?? 0;
             const triggerLabel = actionDef?.trigger ?? 'interact';
             return (
-              <div key={act.id} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, padding: '1px 0' }}>
+              <div
+                key={act.id}
+                ref={selectedEntityId === act.id ? selectedRef : undefined}
+                onClick={() => useEditorStore.getState().setSelectedEntityId(act.id)}
+                style={{
+                  fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0',
+                  cursor: 'pointer', borderRadius: 3,
+                  ...(selectedEntityId === act.id ? SELECTED_STYLE : {}),
+                }}
+              >
                 <span>({act.x},{act.y})</span>
                 <span style={{ color: '#6c7086' }}>{triggerLabel}</span>
                 <span style={{ color: '#6c7086' }}>{stepCount} step{stepCount !== 1 ? 's' : ''}</span>
@@ -219,7 +270,7 @@ export function EntityPanel() {
                   style={{ fontSize: 9, padding: '0 4px', color: '#cba6f7' }}
                 >edit</button>
                 <button
-                  onClick={() => useEditorStore.getState().removeEntity(act.id)}
+                  onClick={(e) => { e.stopPropagation(); useEditorStore.getState().removeEntity(act.id); }}
                   style={{ fontSize: 9, color: '#f38ba8', padding: '0 3px', marginLeft: 'auto' }}
                 >x</button>
               </div>

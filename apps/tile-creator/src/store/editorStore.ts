@@ -86,6 +86,7 @@ export const useEditorStore = create<EditorStore>()(
       animClock: 0,
       animationLibrary: [],
       editingGroupAnimationId: null,
+      selectedEntityId: null as string | null,
       brushStamp: null as import('../types/editor.js').BrushStamp | null,
       editorMode: 'art' as import('../types/editor.js').EditorMode,
       activeGameTool: 'collision' as import('../types/editor.js').GameTool,
@@ -709,6 +710,22 @@ export const useEditorStore = create<EditorStore>()(
           return { ...g, phases };
         });
         set({ scene: { ...scene, groupAnimations: updatedGroups } });
+      },
+
+      selectEntityAt(x: number, y: number) {
+        const { scene } = get();
+        const entities = scene.entities ?? [];
+        // Find entity at this tile position
+        const found = entities.find((e) => {
+          const ew = e.width ?? 1;
+          const eh = e.height ?? 1;
+          return x >= e.x && x < e.x + ew && y >= e.y && y < e.y + eh;
+        });
+        set({ selectedEntityId: found?.id ?? null });
+      },
+
+      setSelectedEntityId(id: string | null) {
+        set({ selectedEntityId: id });
       },
 
       setBrushStamp(brush: import('../types/editor.js').BrushStamp | null) {
