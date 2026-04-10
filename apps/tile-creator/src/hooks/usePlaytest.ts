@@ -1,7 +1,21 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { GameLoop, InputManager, loadTilemap } from '@storyengine/engine';
-import type { SceneJSON, EntityDef, DialogueLine, ActionDef } from '@storyengine/shared';
+import type { SceneJSON, EntityDef, DialogueLine, ActionDef, SpriteSheetDef, SpriteAnimState } from '@storyengine/shared';
 import { decodeTransform } from '../lib/transformUtils.js';
+
+/** Loaded sprite sheet with image and state lookup map. */
+interface LoadedSpriteSheet {
+  def: SpriteSheetDef;
+  image: HTMLImageElement;
+  stateMap: Map<string, SpriteAnimState>;
+}
+
+/** Per-actor animation state during playtest. */
+interface ActorAnim {
+  stateName: string;
+  frame: number;
+  accumMs: number;
+}
 
 export interface MediaOverlay {
   type: 'video' | 'audio' | 'image' | 'slideshow' | 'playerInput';
@@ -46,6 +60,8 @@ interface PlaytestConfig {
     scenes: { id: string; name: string; scene: SceneJSON }[];
   };
   tileImages: ImageBitmap[];
+  /** Sprite sheets available to resolve entity spriteSheetId references. */
+  spriteSheets: { id: string; def: SpriteSheetDef; dataUrl: string }[];
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   onStateChange: (state: PlaytestState) => void;
   scale?: number;
@@ -64,12 +80,59 @@ export function usePlaytest(config: PlaytestConfig) {
   const sceneRef = useRef<SceneJSON | null>(null);
   const loopRef = useRef<GameLoop | null>(null);
   const inputRef = useRef<InputManager | null>(null);
+  /** Cache of loaded sprite sheets by id. Populated at start(). */
+  const spriteSheetsRef = useRef<Map<string, LoadedSpriteSheet>>(new Map());
+  /** Per-entity animation state, keyed by entity ID ('player' for the player). */
+  const actorAnimsRef = useRef<Map<string, ActorAnim>>(new Map());
 
-  const { collection, tileImages, canvasRef, onStateChange, scale = 3 } = config;
+  const { collection, tileImages, spriteSheets, canvasRef, onStateChange, scale = 3 } = config;
 
   const notify = useCallback(() => {
     onStateChange({ ...stateRef.current });
   }, [onStateChange]);
+
+  /** Resolve the best animation state for an actor given movement + facing. */
+  const resolveActorState = useCallback((
+    sheet: LoadedSpriteSheet,
+    facing: 'down' | 'up' | 'left' | 'right',
+    isMoving: boolean,
+  ): string => {
+    const prefix = isMoving ? 'walk' : 'idle';
+    const desired = `${prefix}-${facing}`;
+    if (sheet.stateMap.has(desired)) return desired;
+    // Fallback: try the other mode for this facing
+    const alt = `${isMoving ? 'idle' : 'walk'}-${facing}`;
+    if (sheet.stateMap.has(alt)) return alt;
+    // Fallback: default state
+    return sheet.def.defaultState;
+  }, []);
+
+  /** Advance the animation frame counter for an actor. */
+  const advanceActorAnim = useCallback((
+    entityId: string,
+    sheet: LoadedSpriteSheet,
+    desiredState: string,
+    dt: number,
+  ): ActorAnim => {
+    let anim = actorAnimsRef.current.get(entityId);
+    if (!anim || anim.stateName !== desiredState) {
+      anim = { stateName: desiredState, frame: 0, accumMs: 0 };
+      actorAnimsRef.current.set(entityId, anim);
+    }
+    const state = sheet.stateMap.get(desiredState);
+    if (!state || state.frameCount <= 1) return anim;
+    anim.accumMs += dt;
+    const frameDuration = 1000 / state.fps;
+    while (anim.accumMs >= frameDuration) {
+      anim.accumMs -= frameDuration;
+      anim.frame++;
+      if (anim.frame >= state.frameCount) {
+        anim.frame = state.loop !== false ? 0 : state.frameCount - 1;
+        if (state.loop === false) break;
+      }
+    }
+    return anim;
+  }, []);
 
   const loadScene = useCallback((sceneId: string, spawnX?: number, spawnY?: number) => {
     const entry = collection.scenes.find((s) => s.id === sceneId);
@@ -279,6 +342,18 @@ export function usePlaytest(config: PlaytestConfig) {
     stateRef.current.running = true;
     stateRef.current.firedActions = new Set();
     stateRef.current.flags = {};
+    actorAnimsRef.current.clear();
+
+    // Preload sprite sheets into the cache (async, but we start the loop anyway
+    // since rendering gracefully falls back to the placeholder while loading)
+    spriteSheetsRef.current.clear();
+    for (const sheet of spriteSheets) {
+      const img = new Image();
+      img.src = sheet.dataUrl;
+      const stateMap = new Map(sheet.def.states.map((s) => [s.name, s]));
+      const loaded: LoadedSpriteSheet = { def: sheet.def, image: img, stateMap };
+      spriteSheetsRef.current.set(sheet.id, loaded);
+    }
 
     loadScene(collection.scenes[0].id);
 
@@ -383,6 +458,30 @@ export function usePlaytest(config: PlaytestConfig) {
         // Update tile animations
         tilemap.updateAnimations(dt);
 
+        // Update sprite animations — player
+        const spawn = scene.entities?.find((e) => e.type === 'spawn');
+        const playerSheetId = spawn?.properties?.spriteSheetId as string | undefined;
+        if (playerSheetId) {
+          const sheet = spriteSheetsRef.current.get(playerSheetId);
+          if (sheet) {
+            const playerIsMoving = move.x !== 0 || move.y !== 0;
+            const stateName = resolveActorState(sheet, s.facing, playerIsMoving);
+            advanceActorAnim('player', sheet, stateName, dt);
+          }
+        }
+        // NPCs (currently idle only — NPCs don't move yet)
+        for (const ent of scene.entities ?? []) {
+          if (ent.type !== 'npc') continue;
+          const npcSheetId = ent.properties?.spriteSheetId as string | undefined;
+          if (!npcSheetId) continue;
+          const sheet = spriteSheetsRef.current.get(npcSheetId);
+          if (!sheet) continue;
+          const stateName = sheet.stateMap.has('idle-down')
+            ? 'idle-down'
+            : sheet.def.defaultState;
+          advanceActorAnim(ent.id, sheet, stateName, dt);
+        }
+
         input.endFrame();
       },
 
@@ -440,23 +539,82 @@ export function usePlaytest(config: PlaytestConfig) {
           }
         }
 
-        // Draw NPC markers (small yellow dots)
+        // Draw NPCs — sprite if assigned, else yellow dot placeholder
         for (const ent of scene.entities ?? []) {
           if (ent.type !== 'npc') continue;
+          const npcSheetId = ent.properties?.spriteSheetId as string | undefined;
+          const npcSheet = npcSheetId ? spriteSheetsRef.current.get(npcSheetId) : undefined;
           const ex = (ent.x * ts + ts / 2) * scale;
           const ey = (ent.y * ts + ts / 2) * scale;
-          ctx.fillStyle = '#f9e2af';
-          ctx.beginPath();
-          ctx.arc(ex, ey, 4 * scale, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = '#1e1e2e';
-          ctx.lineWidth = 1;
-          ctx.stroke();
+
+          if (npcSheet && npcSheet.image.complete && npcSheet.image.naturalWidth > 0) {
+            // NPCs default to idle-down unless a defaultState suggests otherwise
+            const stateName = npcSheet.stateMap.has('idle-down')
+              ? 'idle-down'
+              : npcSheet.def.defaultState;
+            const anim = actorAnimsRef.current.get(ent.id);
+            const frame = anim?.frame ?? 0;
+            const state = npcSheet.stateMap.get(stateName);
+            if (state) {
+              const sx = (state.colStart + frame) * npcSheet.def.frameWidth;
+              const sy = state.row * npcSheet.def.frameHeight;
+              const drawW = npcSheet.def.frameWidth * scale;
+              const drawH = npcSheet.def.frameHeight * scale;
+              // Anchor: feet at the tile center bottom
+              const dx = ex - drawW / 2;
+              const dy = (ent.y * ts + ts) * scale - drawH;
+              ctx.drawImage(
+                npcSheet.image,
+                sx, sy, npcSheet.def.frameWidth, npcSheet.def.frameHeight,
+                dx, dy, drawW, drawH,
+              );
+            }
+          } else {
+            // Placeholder: yellow dot
+            ctx.fillStyle = '#f9e2af';
+            ctx.beginPath();
+            ctx.arc(ex, ey, 4 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#1e1e2e';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
         }
 
-        // Draw player — tile-sized character with strong visibility
+        // Draw player — sprite if assigned, else green-square placeholder
         const playerPx = s.px * scale;
         const playerPy = s.py * scale;
+        const playerSheetId = (() => {
+          const spawn = scene.entities?.find((e) => e.type === 'spawn');
+          return spawn?.properties?.spriteSheetId as string | undefined;
+        })();
+        const playerSheet = playerSheetId
+          ? spriteSheetsRef.current.get(playerSheetId)
+          : undefined;
+
+        if (playerSheet && playerSheet.image.complete && playerSheet.image.naturalWidth > 0) {
+          const anim = actorAnimsRef.current.get('player');
+          const stateName = anim?.stateName ?? playerSheet.def.defaultState;
+          const state = playerSheet.stateMap.get(stateName);
+          if (state) {
+            const frame = anim?.frame ?? 0;
+            const sx = (state.colStart + frame) * playerSheet.def.frameWidth;
+            const sy = state.row * playerSheet.def.frameHeight;
+            const drawW = playerSheet.def.frameWidth * scale;
+            const drawH = playerSheet.def.frameHeight * scale;
+            // Anchor: feet at the tile center bottom
+            const dx = playerPx - drawW / 2;
+            const dy = (s.py + ts / 2) * scale - drawH;
+            ctx.drawImage(
+              playerSheet.image,
+              sx, sy, playerSheet.def.frameWidth, playerSheet.def.frameHeight,
+              dx, dy, drawW, drawH,
+            );
+          }
+          return; // done rendering player
+        }
+
+        // Placeholder path — tile-sized character with strong visibility
         const pSize = ts * scale; // Full tile size
         const pHalf = pSize / 2;
 
@@ -527,7 +685,7 @@ export function usePlaytest(config: PlaytestConfig) {
     loopRef.current = loop;
     loop.start();
     notify();
-  }, [collection, tileImages, canvasRef, scale, loadScene, handleInteract, executeAction, notify]);
+  }, [collection, tileImages, spriteSheets, canvasRef, scale, loadScene, handleInteract, executeAction, resolveActorState, advanceActorAnim, notify]);
 
   const stop = useCallback(() => {
     loopRef.current?.stop();

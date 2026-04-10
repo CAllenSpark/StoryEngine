@@ -27,6 +27,7 @@ function resetStore() {
     animationLibrary: [],
     editingGroupAnimationId: null,
     selectedEntityId: null,
+    spriteSheetLibrary: [],
     brushStamp: null,
     editorMode: 'art',
     activeGameTool: 'collision',

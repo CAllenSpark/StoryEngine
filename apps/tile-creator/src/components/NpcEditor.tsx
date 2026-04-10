@@ -12,11 +12,16 @@ export function NpcEditor({ entityId, onClose }: NpcEditorProps) {
     (s.scene.entities ?? []).find((e) => e.id === entityId),
   );
 
+  const spriteSheetLibrary = useEditorStore((s) => s.spriteSheetLibrary);
+
   const [name, setName] = useState<string>(
     (entity?.properties?.name as string) ?? 'NPC',
   );
   const [lines, setLines] = useState<DialogueLine[]>(
     (entity?.properties?.dialogue as DialogueLine[]) ?? [],
+  );
+  const [spriteSheetId, setSpriteSheetId] = useState<string>(
+    (entity?.properties?.spriteSheetId as string) ?? '',
   );
 
   if (!entity) return null;
@@ -37,7 +42,12 @@ export function NpcEditor({ entityId, onClose }: NpcEditorProps) {
 
   const handleSave = () => {
     useEditorStore.getState().updateEntity(entityId, {
-      properties: { ...entity.properties, name, dialogue: lines },
+      properties: {
+        ...entity.properties,
+        name,
+        dialogue: lines,
+        spriteSheetId: spriteSheetId || undefined,
+      },
     });
     onClose();
   };
@@ -76,6 +86,25 @@ export function NpcEditor({ entityId, onClose }: NpcEditorProps) {
               padding: '2px 6px', fontSize: 12,
             }}
           />
+        </div>
+
+        {/* Sprite Sheet */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 12, fontWeight: 600 }}>Sprite:</span>
+          <select
+            value={spriteSheetId}
+            onChange={(e) => setSpriteSheetId(e.target.value)}
+            style={{
+              flex: 1, background: '#313244', color: '#cdd6f4',
+              border: '1px solid #45475a', borderRadius: 4,
+              padding: '2px 6px', fontSize: 11,
+            }}
+          >
+            <option value="">— none (yellow dot) —</option>
+            {spriteSheetLibrary.map((s) => (
+              <option key={s.id} value={s.id}>{s.def.name}</option>
+            ))}
+          </select>
         </div>
 
         {/* Dialogue lines */}

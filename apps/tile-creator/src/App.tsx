@@ -10,6 +10,7 @@ import { TilesetLibrary } from './components/TilesetLibrary.js';
 import { CollectionPanel } from './components/CollectionPanel.js';
 import { PrefabPanel } from './components/PrefabPanel.js';
 import { EntityPanel } from './components/EntityPanel.js';
+import { SpriteLibraryPanel } from './components/SpriteLibraryPanel.js';
 import { ExportBar } from './components/ExportBar.js';
 import './App.css';
 
@@ -71,6 +72,7 @@ export function App() {
     useEditorStore.getState().loadLibrary();
     useEditorStore.getState().restoreCollection();
     useEditorStore.getState().loadPrefabLibrary();
+    useEditorStore.getState().loadSpriteSheetLibrary();
   }, []);
 
   useEffect(() => {
@@ -111,6 +113,7 @@ export function App() {
           <CollectionPanel />
           {editorMode === 'art' && <PrefabPanel />}
           {editorMode === 'game' && <EntityPanel />}
+          <SpriteLibraryPanel />
           <TilesetLibrary />
         </div>
       </div>

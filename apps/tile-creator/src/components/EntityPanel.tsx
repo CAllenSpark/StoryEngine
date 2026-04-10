@@ -15,6 +15,7 @@ export function EntityPanel() {
   const scene = useEditorStore((s) => s.scene);
   const collection = useEditorStore((s) => s.currentCollection);
   const selectedEntityId = useEditorStore((s) => s.selectedEntityId);
+  const spriteSheetLibrary = useEditorStore((s) => s.spriteSheetLibrary);
   const entities = scene.entities ?? [];
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingNpcId, setEditingNpcId] = useState<string | null>(null);
@@ -124,24 +125,52 @@ export function EntityPanel() {
       {spawns.length > 0 && (
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#a6e3a1' }}>Spawn</div>
-          {spawns.map((s) => (
-            <div
-              key={s.id}
-              ref={selectedEntityId === s.id ? selectedRef : undefined}
-              onClick={() => useEditorStore.getState().setSelectedEntityId(s.id)}
-              style={{
-                fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0',
-                cursor: 'pointer', borderRadius: 3,
-                ...(selectedEntityId === s.id ? SELECTED_STYLE : {}),
-              }}
-            >
-              <span>({s.x}, {s.y})</span>
-              <button
-                onClick={(e) => { e.stopPropagation(); useEditorStore.getState().removeEntity(s.id); }}
-                style={{ fontSize: 9, color: '#f38ba8', padding: '0 3px', marginLeft: 'auto' }}
-              >x</button>
-            </div>
-          ))}
+          {spawns.map((s) => {
+            const spriteSheetId = (s.properties?.spriteSheetId as string) ?? '';
+            return (
+              <div
+                key={s.id}
+                ref={selectedEntityId === s.id ? selectedRef : undefined}
+                onClick={() => useEditorStore.getState().setSelectedEntityId(s.id)}
+                style={{
+                  fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2, padding: '2px 0',
+                  cursor: 'pointer', borderRadius: 3,
+                  ...(selectedEntityId === s.id ? SELECTED_STYLE : {}),
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>({s.x}, {s.y})</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); useEditorStore.getState().removeEntity(s.id); }}
+                    style={{ fontSize: 9, color: '#f38ba8', padding: '0 3px', marginLeft: 'auto' }}
+                  >x</button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}>
+                  <span style={{ color: '#6c7086' }}>sprite:</span>
+                  <select
+                    value={spriteSheetId}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      useEditorStore.getState().updateEntity(s.id, {
+                        properties: { ...s.properties, spriteSheetId: e.target.value || undefined },
+                      });
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      flex: 1, background: '#313244', color: '#cdd6f4',
+                      border: '1px solid #45475a', borderRadius: 3,
+                      padding: '1px 2px', fontSize: 10,
+                    }}
+                  >
+                    <option value="">— placeholder —</option>
+                    {spriteSheetLibrary.map((sheet) => (
+                      <option key={sheet.id} value={sheet.id}>{sheet.def.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

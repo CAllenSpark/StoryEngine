@@ -92,6 +92,7 @@ export const useEditorStore = create<EditorStore>()(
       animationLibrary: [],
       editingGroupAnimationId: null,
       selectedEntityId: null as string | null,
+      spriteSheetLibrary: [] as import('../lib/assetDb.js').StoredSpriteSheet[],
       brushStamp: null as import('../types/editor.js').BrushStamp | null,
       editorMode: 'art' as import('../types/editor.js').EditorMode,
       activeGameTool: 'collision' as import('../types/editor.js').GameTool,
@@ -544,6 +545,35 @@ export const useEditorStore = create<EditorStore>()(
         } catch (err) {
           logger.warn('Failed to load prefab library', { error: String(err) });
         }
+      },
+
+      async loadSpriteSheetLibrary() {
+        try {
+          const { listSpriteSheets } = await import('../lib/assetDb.js');
+          const sheets = await listSpriteSheets();
+          set({ spriteSheetLibrary: sheets });
+        } catch (err) {
+          logger.warn('Failed to load sprite sheet library', { error: String(err) });
+        }
+      },
+
+      async saveSpriteSheet(def: import('@storyengine/shared').SpriteSheetDef, dataUrl: string) {
+        const { saveSpriteSheet, listSpriteSheets } = await import('../lib/assetDb.js');
+        await saveSpriteSheet({
+          id: def.id,
+          def,
+          dataUrl,
+          storedAt: Date.now(),
+        });
+        const sheets = await listSpriteSheets();
+        set({ spriteSheetLibrary: sheets });
+      },
+
+      async deleteSpriteSheet(id: string) {
+        const { deleteSpriteSheetById, listSpriteSheets } = await import('../lib/assetDb.js');
+        await deleteSpriteSheetById(id);
+        const sheets = await listSpriteSheets();
+        set({ spriteSheetLibrary: sheets });
       },
 
       setColor(color: string) {

@@ -1,5 +1,5 @@
-import type { SceneJSON, SceneCollection, TilesetRef, AnimationPhase, GroupAnimationPhase, GroupAnimation, EntityDef } from '@storyengine/shared';
-import type { StoredTileset } from '../lib/assetDb.js';
+import type { SceneJSON, SceneCollection, TilesetRef, AnimationPhase, GroupAnimationPhase, GroupAnimation, EntityDef, SpriteSheetDef } from '@storyengine/shared';
+import type { StoredTileset, StoredSpriteSheet } from '../lib/assetDb.js';
 
 export type Tool = 'paint' | 'erase' | 'select' | 'colorPaint';
 export type GameTool = 'collision' | 'spawn' | 'exit' | 'npc' | 'action';
@@ -83,6 +83,7 @@ export interface EditorState {
   animationLibrary: StoredAnimation[];
   editingGroupAnimationId: string | null;
   selectedEntityId: string | null;
+  spriteSheetLibrary: StoredSpriteSheet[];
   brushStamp: BrushStamp | null;
   editorMode: EditorMode;
   activeGameTool: GameTool;
@@ -148,6 +149,9 @@ export interface EditorActions {
   captureGroupFrame: (groupId: string) => void;
   selectEntityAt: (x: number, y: number) => void;
   setSelectedEntityId: (id: string | null) => void;
+  loadSpriteSheetLibrary: () => Promise<void>;
+  saveSpriteSheet: (def: SpriteSheetDef, dataUrl: string) => Promise<void>;
+  deleteSpriteSheet: (id: string) => Promise<void>;
   setBrushStamp: (brush: BrushStamp | null) => void;
   stampBrush: (x: number, y: number) => void;
   setEditorMode: (mode: EditorMode) => void;

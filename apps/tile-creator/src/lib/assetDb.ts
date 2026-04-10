@@ -1,12 +1,13 @@
-import type { SceneCollection } from '@storyengine/shared';
+import type { SceneCollection, SpriteSheetDef } from '@storyengine/shared';
 import type { Prefab, StoredAnimation } from '../types/editor.js';
 
 const DB_NAME = 'tile-creator-assets';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 const STORE_TILESETS = 'tilesets';
 const STORE_COLLECTIONS = 'collections';
 const STORE_PREFABS = 'prefabs';
 const STORE_ANIMATIONS = 'animations';
+const STORE_SPRITESHEETS = 'spritesheets';
 
 export interface StoredTileset {
   id: string;
@@ -17,6 +18,13 @@ export interface StoredTileset {
   columns: number;
   storedAt: number;
   folder?: string;
+}
+
+export interface StoredSpriteSheet {
+  id: string;
+  def: SpriteSheetDef;
+  dataUrl: string;
+  storedAt: number;
 }
 
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -39,6 +47,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (oldVersion < 5 && !db.objectStoreNames.contains(STORE_ANIMATIONS)) {
         db.createObjectStore(STORE_ANIMATIONS, { keyPath: 'id' });
+      }
+      if (oldVersion < 6 && !db.objectStoreNames.contains(STORE_SPRITESHEETS)) {
+        db.createObjectStore(STORE_SPRITESHEETS, { keyPath: 'id' });
       }
       if (oldVersion === 1) {
         const store = req.transaction!.objectStore(STORE_TILESETS);
@@ -200,6 +211,46 @@ export async function deleteAnimationById(id: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_ANIMATIONS, 'readwrite');
     tx.objectStore(STORE_ANIMATIONS).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function saveSpriteSheet(sheet: StoredSpriteSheet): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_SPRITESHEETS, 'readwrite');
+    tx.objectStore(STORE_SPRITESHEETS).put(sheet);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function listSpriteSheets(): Promise<StoredSpriteSheet[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_SPRITESHEETS, 'readonly');
+    const req = tx.objectStore(STORE_SPRITESHEETS).getAll();
+    req.onsuccess = () => resolve(req.result ?? []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function loadSpriteSheetById(id: string): Promise<StoredSpriteSheet | null> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_SPRITESHEETS, 'readonly');
+    const req = tx.objectStore(STORE_SPRITESHEETS).get(id);
+    req.onsuccess = () => resolve(req.result ?? null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function deleteSpriteSheetById(id: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_SPRITESHEETS, 'readwrite');
+    tx.objectStore(STORE_SPRITESHEETS).delete(id);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });

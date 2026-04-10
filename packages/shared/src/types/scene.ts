@@ -97,6 +97,44 @@ export interface DialogueLine {
   text: string;
 }
 
+// ── Sprite animation types ──────────────────────────────────────────
+
+/** A named animation state within a spritesheet (e.g. "walk-down"). */
+export interface SpriteAnimState {
+  /** State name. Convention: "{action}-{facing}" like "walk-down", or just "{action}" like "interact". */
+  name: string;
+  /** Row index in the spritesheet grid (0-based). */
+  row: number;
+  /** Starting column within the row where this state's frames begin. */
+  colStart: number;
+  /** Number of frames in this state. */
+  frameCount: number;
+  /** Animation speed in frames per second. */
+  fps: number;
+  /** Whether the animation loops. Default true. */
+  loop?: boolean;
+}
+
+/** A character spritesheet definition — uniform grid of frames with named states. */
+export interface SpriteSheetDef {
+  /** Unique ID. */
+  id: string;
+  /** Human-readable name (e.g. "Hero", "Villager"). */
+  name: string;
+  /** Width of one frame in pixels. */
+  frameWidth: number;
+  /** Height of one frame in pixels. */
+  frameHeight: number;
+  /** Columns in the grid. */
+  columns: number;
+  /** Rows in the grid. */
+  rows: number;
+  /** Named animation states. */
+  states: SpriteAnimState[];
+  /** Default state name when idle (e.g. "idle-down"). */
+  defaultState: string;
+}
+
 export interface SceneConnection {
   direction: string;
   targetSceneId: string;
@@ -128,6 +166,8 @@ export interface SceneCollection {
   name: string;
   scenes: SceneEntry[];
   activeTilesetId?: string;
+  /** Sprite sheet definitions used by entities in this collection. */
+  spriteSheets?: SpriteSheetDef[];
   createdAt: number;
   updatedAt: number;
 }

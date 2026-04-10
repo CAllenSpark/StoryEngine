@@ -29,6 +29,7 @@ export function PlaytestMode({ onClose }: PlaytestModeProps) {
   const scene = useEditorStore((s) => s.scene);
   const currentSceneId = useEditorStore((s) => s.currentSceneId);
   const tileset = useEditorStore((s) => s.tileset);
+  const spriteSheetLibrary = useEditorStore((s) => s.spriteSheetLibrary);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [state, setState] = useState<PlaytestState | null>(null);
 
@@ -49,6 +50,11 @@ export function PlaytestMode({ onClose }: PlaytestModeProps) {
   const { start, stop } = usePlaytest({
     collection: snapshotCollection,
     tileImages: tileset?.tileImages ?? [],
+    spriteSheets: spriteSheetLibrary.map((s) => ({
+      id: s.id,
+      def: s.def,
+      dataUrl: s.dataUrl,
+    })),
     canvasRef,
     onStateChange,
     scale: 3,
