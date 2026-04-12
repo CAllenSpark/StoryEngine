@@ -153,6 +153,7 @@ export interface EditorActions {
   saveSpriteSheet: (def: SpriteSheetDef, dataUrl: string) => Promise<void>;
   deleteSpriteSheet: (id: string) => Promise<void>;
   importCollectionBundle: (bundle: import('../lib/collectionBundle.js').CollectionBundle) => Promise<void>;
+  loadLighthouseSample: () => Promise<void>;
   setBrushStamp: (brush: BrushStamp | null) => void;
   stampBrush: (x: number, y: number) => void;
   setEditorMode: (mode: EditorMode) => void;

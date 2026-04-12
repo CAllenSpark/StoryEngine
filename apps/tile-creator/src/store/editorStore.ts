@@ -622,6 +622,16 @@ export const useEditorStore = create<EditorStore>()(
         await get().loadCollectionFromDb(bundle.collection.id);
       },
 
+      /**
+       * Generate and import the built-in Lighthouse sample collection.
+       * Safe to call repeatedly — deterministic IDs mean existing assets
+       * are overwritten rather than duplicated.
+       */
+      async loadLighthouseSample() {
+        const { generateLighthouseBundle } = await import('../lib/sampleCollections/lighthouse.js');
+        await get().importCollectionBundle(generateLighthouseBundle());
+      },
+
       setColor(color: string) {
         set({ currentColor: color });
       },

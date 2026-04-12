@@ -61,6 +61,13 @@ export function CollectionPanel() {
           }}
         />
         <button onClick={handleCreate}>New Collection</button>
+        <button
+          onClick={() => useEditorStore.getState().loadLighthouseSample()}
+          style={{ fontSize: 11 }}
+          title="Load the built-in Lighthouse sample to explore the editor"
+        >
+          Load Lighthouse Sample
+        </button>
       </div>
     );
   }
@@ -139,6 +146,17 @@ export function CollectionPanel() {
           title="Import a collection bundle from .json"
         >
           Import
+        </button>
+        <button
+          onClick={() => {
+            if (confirm('Reload the Lighthouse sample? This will overwrite the sample collection if it exists.')) {
+              useEditorStore.getState().loadLighthouseSample();
+            }
+          }}
+          style={{ fontSize: 10, padding: '2px 6px' }}
+          title="Reload the built-in Lighthouse sample collection"
+        >
+          Lighthouse
         </button>
         <input
           ref={importInputRef}
