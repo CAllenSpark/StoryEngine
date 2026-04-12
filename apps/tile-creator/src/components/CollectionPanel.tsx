@@ -1,15 +1,20 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useEditorStore } from '../store/editorStore.js';
+import { buildCollectionBundle, downloadBundle, parseBundleFile } from '../lib/collectionBundle.js';
 
 export function CollectionPanel() {
   const collection = useEditorStore((s) => s.currentCollection);
   const currentSceneId = useEditorStore((s) => s.currentSceneId);
+  const tilesetLibrary = useEditorStore((s) => s.tilesetLibrary);
+  const spriteSheetLibrary = useEditorStore((s) => s.spriteSheetLibrary);
   const createCollection = useEditorStore((s) => s.createCollection);
   const addSceneToCollection = useEditorStore((s) => s.addSceneToCollection);
   const switchScene = useEditorStore((s) => s.switchScene);
   const renameScene = useEditorStore((s) => s.renameScene);
   const deleteScene = useEditorStore((s) => s.deleteScene);
   const saveCollectionToDb = useEditorStore((s) => s.saveCollectionToDb);
+  const importBundle = useEditorStore((s) => s.importCollectionBundle);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -118,6 +123,41 @@ export function CollectionPanel() {
         >
           {saveStatus === 'idle' ? 'Save' : saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Error'}
         </button>
+        <button
+          onClick={() => {
+            const bundle = buildCollectionBundle(collection, tilesetLibrary, spriteSheetLibrary);
+            downloadBundle(bundle);
+          }}
+          style={{ fontSize: 10, padding: '2px 6px' }}
+          title="Download collection + assets as a single .json file"
+        >
+          Export
+        </button>
+        <button
+          onClick={() => importInputRef.current?.click()}
+          style={{ fontSize: 10, padding: '2px 6px' }}
+          title="Import a collection bundle from .json"
+        >
+          Import
+        </button>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept="application/json,.json"
+          style={{ display: 'none' }}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            try {
+              const bundle = await parseBundleFile(file);
+              await importBundle(bundle);
+            } catch (err) {
+              alert(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
+            } finally {
+              e.target.value = '';
+            }
+          }}
+        />
       </div>
       {collection.scenes.map((entry) => (
         <div

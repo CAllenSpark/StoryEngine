@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { ActionStep } from '@storyengine/shared';
-import { runActionSteps, STEP_HANDLERS, type StepHandlerContext } from '../src/hooks/playtest/actionHandlers.js';
+import type { ActionDef, ActionStep } from '@storyengine/shared';
+import { runActionSteps, STEP_HANDLERS, canTriggerAction, type StepHandlerContext } from '../src/hooks/playtest/actionHandlers.js';
 import type { PlaytestState } from '../src/hooks/playtest/types.js';
 
 function freshState(): PlaytestState {
@@ -9,6 +9,7 @@ function freshState(): PlaytestState {
     sceneId: '', dialogue: null, dialogueIndex: 0,
     running: true, firedActions: new Set(), flags: {},
     media: null, audio: null, lastChoice: null,
+    ended: false, endMessage: null,
   };
 }
 
@@ -164,6 +165,74 @@ describe('STEP_HANDLERS', () => {
       }, ctx);
       expect(state.media?.prompt).toBe('What do you do?');
     });
+  });
+});
+
+describe('endAdventure', () => {
+  it('sets ended and halts further steps', () => {
+    const state = freshState();
+    const { ctx } = makeCtx(state);
+    const result = STEP_HANDLERS.endAdventure({
+      type: 'endAdventure',
+      params: { message: 'You escaped!' },
+    }, ctx);
+    expect(result).toBe('halt');
+    expect(state.ended).toBe(true);
+    expect(state.endMessage).toBe('You escaped!');
+  });
+
+  it('works without a message', () => {
+    const state = freshState();
+    const { ctx } = makeCtx(state);
+    STEP_HANDLERS.endAdventure({ type: 'endAdventure', params: {} }, ctx);
+    expect(state.ended).toBe(true);
+    expect(state.endMessage).toBeNull();
+  });
+
+  it('prevents subsequent steps from running via runActionSteps', () => {
+    const state = freshState();
+    const { ctx } = makeCtx(state);
+    runActionSteps([
+      { type: 'endAdventure', params: { message: 'Fin.' } },
+      { type: 'playAudio', params: { url: 'should-not-play' } },
+    ], ctx);
+    expect(state.ended).toBe(true);
+    expect(state.audio).toBeNull();
+  });
+});
+
+describe('canTriggerAction', () => {
+  function makeAction(overrides: Partial<ActionDef> = {}): ActionDef {
+    return { trigger: 'interact', steps: [], ...overrides };
+  }
+
+  it('returns true when there is no condition', () => {
+    expect(canTriggerAction(makeAction(), freshState())).toBe(true);
+  });
+
+  it('returns false when a required flag is unset', () => {
+    const action = makeAction({ condition: { flag: 'hasKey' } });
+    expect(canTriggerAction(action, freshState())).toBe(false);
+  });
+
+  it('returns true when a required flag is set', () => {
+    const action = makeAction({ condition: { flag: 'hasKey' } });
+    const state = freshState();
+    state.flags.hasKey = true;
+    expect(canTriggerAction(action, state)).toBe(true);
+  });
+
+  it('treats falsy flag values as unmet', () => {
+    const action = makeAction({ condition: { flag: 'hasKey' } });
+    const state = freshState();
+    state.flags.hasKey = false;
+    expect(canTriggerAction(action, state)).toBe(false);
+  });
+
+  it('returns true for conditions that only specify item (not yet implemented)', () => {
+    // item-based conditions return true until the inventory system lands
+    const action = makeAction({ condition: { item: 'compass' } });
+    expect(canTriggerAction(action, freshState())).toBe(true);
   });
 });
 

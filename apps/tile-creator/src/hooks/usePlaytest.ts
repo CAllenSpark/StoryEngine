@@ -6,7 +6,7 @@ import { decodeTransform } from '../lib/transformUtils.js';
 import type { PlaytestState, MediaOverlay } from './playtest/types.js';
 import type { LoadedSpriteSheet, ActorAnim } from './playtest/actorAnimations.js';
 import { loadSpriteSheet, resolveActorState, advanceActorAnim } from './playtest/actorAnimations.js';
-import { runActionSteps, type StepHandlerContext } from './playtest/actionHandlers.js';
+import { runActionSteps, canTriggerAction, type StepHandlerContext } from './playtest/actionHandlers.js';
 
 // Re-export types for consumers
 export type { PlaytestState, MediaOverlay };
@@ -31,6 +31,7 @@ export function usePlaytest(config: PlaytestConfig) {
     sceneId: '', dialogue: null, dialogueIndex: 0,
     running: false, firedActions: new Set(), flags: {},
     media: null, audio: null, lastChoice: null,
+    ended: false, endMessage: null,
   });
   const tilemapRef = useRef<Tilemap | null>(null);
   const sceneRef = useRef<SceneJSON | null>(null);
@@ -90,6 +91,7 @@ export function usePlaytest(config: PlaytestConfig) {
       const action = ent.properties?.action;
       if (!action || action.trigger !== 'auto') continue;
       if (action.oneShot && stateRef.current.firedActions.has(ent.id)) continue;
+      if (!canTriggerAction(action, stateRef.current)) continue;
       executeAction(ent, action);
     }
 
@@ -185,6 +187,7 @@ export function usePlaytest(config: PlaytestConfig) {
       const action = actionEntity.properties?.action;
       if (!action || action.trigger !== 'interact') return;
       if (action.oneShot && stateRef.current.firedActions.has(actionEntity.id)) return;
+      if (!canTriggerAction(action, stateRef.current)) return;
       executeAction(actionEntity, action);
     }
   }, [findNearbyEntity, executeAction, dismissOverlay, notify]);
@@ -197,6 +200,8 @@ export function usePlaytest(config: PlaytestConfig) {
     stateRef.current.running = true;
     stateRef.current.firedActions = new Set();
     stateRef.current.flags = {};
+    stateRef.current.ended = false;
+    stateRef.current.endMessage = null;
     actorAnimsRef.current.clear();
 
     // Preload sprite sheets into the cache (async, but we start the loop anyway
@@ -215,6 +220,9 @@ export function usePlaytest(config: PlaytestConfig) {
         const scene = sceneRef.current;
         const input = inputRef.current;
         if (!tilemap || !scene || !input) return;
+
+        // Adventure is over — no input processing until restart
+        if (s.ended) { input.endFrame(); return; }
 
         // Don't move while dialogue or media overlay is active
         if (s.dialogue || s.media) {
@@ -285,6 +293,7 @@ export function usePlaytest(config: PlaytestConfig) {
           if (!action || action.trigger !== 'step') continue;
           if (ent.x === playerTileX && ent.y === playerTileY) {
             if (action.oneShot && s.firedActions.has(ent.id)) continue;
+            if (!canTriggerAction(action, s)) continue;
             executeAction(ent, action);
           }
         }

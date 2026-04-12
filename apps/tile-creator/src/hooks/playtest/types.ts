@@ -38,4 +38,8 @@ export interface PlaytestState {
   audio: { url: string; loop: boolean } | null;
   /** Last playerInput choice. */
   lastChoice: string | null;
+  /** Adventure has ended — show the resolution card. */
+  ended: boolean;
+  /** Optional message for the resolution card. */
+  endMessage: string | null;
 }

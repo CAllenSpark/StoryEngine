@@ -79,7 +79,8 @@ export type ActionType =
   | 'showSlideshow'
   | 'playerInput'
   | 'changePlayerState'
-  | 'playActorAnimation';
+  | 'playActorAnimation'
+  | 'endAdventure';
 
 export interface ActionStep {
   type: ActionType;

@@ -26,12 +26,14 @@ const ACTION_TYPE_LABELS: Record<ActionType, string> = {
   playerInput: 'Player Input Prompt',
   changePlayerState: 'Change Player State',
   playActorAnimation: 'Play Actor Animation',
+  endAdventure: 'End Adventure',
 };
 
 const IMPLEMENTED_ACTIONS: ActionType[] = [
   'showDialogue', 'playGroupAnimation', 'changeScene',
   'playVideo', 'playAudio', 'stopAudio', 'showImage',
   'showSlideshow', 'playerInput', 'changePlayerState',
+  'endAdventure',
 ];
 const STUB_ACTIONS: ActionType[] = ['playActorAnimation'];
 
@@ -234,6 +236,7 @@ function getDefaultParams(type: ActionType): Record<string, unknown> {
     case 'playerInput': return { prompt: '', options: ['look', 'use', 'take'] };
     case 'changePlayerState': return { flag: '', value: true };
     case 'playActorAnimation': return { actorId: '', animation: '' };
+    case 'endAdventure': return { message: '' };
     default: return {};
   }
 }
@@ -324,7 +327,156 @@ function renderStepEditor(
         </div>
       );
     }
+    case 'endAdventure': {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <input
+            type="text"
+            placeholder="Optional resolution message..."
+            value={(p.message as string) ?? ''}
+            onChange={(e) => updateStep(index, { ...p, message: e.target.value })}
+            style={inputStyleSmall}
+          />
+          <span style={hintStyle}>Shows "The End" card. Stops playtest.</span>
+        </div>
+      );
+    }
+    case 'changePlayerState': {
+      return (
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            placeholder="flag name"
+            value={(p.flag as string) ?? ''}
+            onChange={(e) => updateStep(index, { ...p, flag: e.target.value })}
+            style={{ ...inputStyleSmall, width: 100 }}
+          />
+          <span style={{ fontSize: 10 }}>=</span>
+          <select
+            value={String((p.value as boolean | undefined) ?? true)}
+            onChange={(e) => updateStep(index, { ...p, value: e.target.value === 'true' })}
+            style={{ background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 3, fontSize: 10, padding: '1px 2px' }}
+          >
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+        </div>
+      );
+    }
+    case 'playAudio': {
+      return (
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            placeholder="audio URL (e.g. /audio/theme.mp3)"
+            value={(p.url as string) ?? ''}
+            onChange={(e) => updateStep(index, { ...p, url: e.target.value })}
+            style={{ ...inputStyleSmall, flex: 1, minWidth: 150 }}
+          />
+          <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 2 }}>
+            <input
+              type="checkbox"
+              checked={(p.loop as boolean) ?? false}
+              onChange={(e) => updateStep(index, { ...p, loop: e.target.checked })}
+            />
+            loop
+          </label>
+        </div>
+      );
+    }
+    case 'stopAudio': {
+      return <span style={hintStyle}>Stops currently playing audio.</span>;
+    }
+    case 'playVideo':
+    case 'showImage': {
+      return (
+        <input
+          type="text"
+          placeholder={step.type === 'playVideo' ? 'video URL (e.g. /video/intro.mp4)' : 'image URL (e.g. /img/map.png)'}
+          value={(p.url as string) ?? ''}
+          onChange={(e) => updateStep(index, { ...p, url: e.target.value })}
+          style={{ ...inputStyleSmall, width: '100%' }}
+        />
+      );
+    }
+    case 'showSlideshow': {
+      const images = (p.images as string[]) ?? [];
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {images.map((url, i) => (
+            <div key={i} style={{ display: 'flex', gap: 4 }}>
+              <input
+                type="text"
+                placeholder="image URL"
+                value={url}
+                onChange={(e) => {
+                  const next = [...images];
+                  next[i] = e.target.value;
+                  updateStep(index, { ...p, images: next });
+                }}
+                style={{ ...inputStyleSmall, flex: 1 }}
+              />
+              <button
+                onClick={() => updateStep(index, { ...p, images: images.filter((_, j) => j !== i) })}
+                style={{ fontSize: 9, color: '#f38ba8', padding: '0 3px' }}
+              >×</button>
+            </div>
+          ))}
+          <button
+            onClick={() => updateStep(index, { ...p, images: [...images, ''] })}
+            style={{ fontSize: 10, alignSelf: 'flex-start' }}
+          >+ Add Image</button>
+        </div>
+      );
+    }
+    case 'playerInput': {
+      const options = (p.options as string[]) ?? [];
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <input
+            type="text"
+            placeholder="Prompt text"
+            value={(p.prompt as string) ?? ''}
+            onChange={(e) => updateStep(index, { ...p, prompt: e.target.value })}
+            style={{ ...inputStyleSmall, width: '100%' }}
+          />
+          {options.map((opt, i) => (
+            <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <span style={{ fontSize: 10, color: '#6c7086', width: 16 }}>{i + 1}.</span>
+              <input
+                type="text"
+                value={opt}
+                onChange={(e) => {
+                  const next = [...options];
+                  next[i] = e.target.value;
+                  updateStep(index, { ...p, options: next });
+                }}
+                style={{ ...inputStyleSmall, flex: 1 }}
+              />
+              <button
+                onClick={() => updateStep(index, { ...p, options: options.filter((_, j) => j !== i) })}
+                style={{ fontSize: 9, color: '#f38ba8', padding: '0 3px' }}
+              >×</button>
+            </div>
+          ))}
+          <button
+            onClick={() => updateStep(index, { ...p, options: [...options, ''] })}
+            style={{ fontSize: 10, alignSelf: 'flex-start' }}
+          >+ Add Option</button>
+        </div>
+      );
+    }
     default:
       return <span style={{ fontSize: 10, color: '#6c7086', fontStyle: 'italic' }}>Editor coming soon</span>;
   }
 }
+
+const inputStyleSmall = {
+  background: '#313244', color: '#cdd6f4',
+  border: '1px solid #45475a', borderRadius: 3,
+  padding: '1px 4px', fontSize: 10,
+} as const;
+
+const hintStyle = {
+  fontSize: 10, color: '#6c7086', fontStyle: 'italic',
+} as const;

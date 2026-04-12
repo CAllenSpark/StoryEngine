@@ -577,6 +577,51 @@ export const useEditorStore = create<EditorStore>()(
         set({ spriteSheetLibrary: sheets });
       },
 
+      /**
+       * Import a collection bundle. Overwrites any collection with the same ID,
+       * and adds referenced tilesets/sprite sheets to the library. Switches to
+       * the first scene in the imported collection.
+       */
+      async importCollectionBundle(bundle: import('../lib/collectionBundle.js').CollectionBundle) {
+        const db = await import('../lib/assetDb.js');
+
+        // Import tilesets first (scenes reference them)
+        for (const ts of Object.values(bundle.tilesets)) {
+          await db.saveTilesetToLibrary({
+            id: ts.id,
+            name: ts.name,
+            filename: ts.filename,
+            dataUrl: ts.dataUrl,
+            tileSize: ts.tileSize,
+            columns: ts.columns,
+            storedAt: Date.now(),
+          });
+        }
+
+        // Import sprite sheets
+        for (const [id, s] of Object.entries(bundle.spriteSheets)) {
+          await db.saveSpriteSheet({
+            id,
+            def: s.def,
+            dataUrl: s.dataUrl,
+            storedAt: Date.now(),
+          });
+        }
+
+        // Save the collection
+        await db.saveCollection(bundle.collection);
+
+        // Refresh libraries
+        const [tilesets, sheets] = await Promise.all([
+          db.listAllTilesets(),
+          db.listSpriteSheets(),
+        ]);
+        set({ tilesetLibrary: tilesets, spriteSheetLibrary: sheets });
+
+        // Load the imported collection
+        await get().loadCollectionFromDb(bundle.collection.id);
+      },
+
       setColor(color: string) {
         set({ currentColor: color });
       },

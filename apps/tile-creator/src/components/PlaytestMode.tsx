@@ -252,6 +252,50 @@ export function PlaytestMode({ onClose }: PlaytestModeProps) {
         </div>
       )}
 
+      {/* Resolution card — adventure has ended */}
+      {state?.ended && (
+        <div
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            gap: 20, zIndex: 10,
+          }}
+        >
+          <span style={{
+            fontSize: 48, fontWeight: 700, color: '#f9e2af',
+            letterSpacing: 4, fontFamily: 'serif',
+          }}>
+            The End
+          </span>
+          {state.endMessage && (
+            <span style={{
+              fontSize: 16, color: '#cdd6f4', maxWidth: 500,
+              textAlign: 'center', lineHeight: 1.5,
+              padding: '0 24px',
+            }}>
+              {state.endMessage}
+            </span>
+          )}
+          <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+            <button
+              className="active"
+              onClick={() => { stop(); start(); }}
+              style={{ fontSize: 13, padding: '6px 20px' }}
+            >
+              Play Again
+            </button>
+            <button
+              onClick={() => { stop(); onClose(); }}
+              style={{ fontSize: 13, padding: '6px 20px' }}
+            >
+              Exit to Editor
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Audio indicator */}
       {state?.audio && (
         <div style={{
@@ -261,6 +305,24 @@ export function PlaytestMode({ onClose }: PlaytestModeProps) {
         }}>
           Audio: {state.audio.url ? state.audio.url.split('/').pop() : 'playing'}
           {state.audio.loop && ' (loop)'}
+        </div>
+      )}
+
+      {/* Flag inspector — helps creators debug conditional triggers */}
+      {state?.running && !state.ended && Object.keys(state.flags).length > 0 && (
+        <div style={{
+          position: 'absolute', top: 40, left: 12,
+          fontSize: 10, color: '#a6e3a1', background: 'rgba(30,30,46,0.85)',
+          border: '1px solid #313244', borderRadius: 4,
+          padding: '4px 8px', maxWidth: 200,
+          display: 'flex', flexDirection: 'column', gap: 2,
+        }}>
+          <span style={{ color: '#6c7086', fontWeight: 600, fontSize: 9 }}>FLAGS</span>
+          {Object.entries(state.flags).map(([k, v]) => (
+            <span key={k} style={{ fontFamily: 'monospace' }}>
+              {k}: {String(v)}
+            </span>
+          ))}
         </div>
       )}
 

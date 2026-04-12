@@ -1,5 +1,20 @@
-import type { ActionStep, ActionType, DialogueLine } from '@storyengine/shared';
+import type { ActionDef, ActionStep, ActionType, DialogueLine } from '@storyengine/shared';
 import type { PlaytestState } from './types.js';
+
+/**
+ * Check whether an action's condition is satisfied.
+ * - No condition = always satisfied.
+ * - `condition.flag = "foo"` passes only when `state.flags.foo` is truthy.
+ * - `condition.item` is not yet implemented (returns true for now — inventory
+ *   system is planned for a future sprint).
+ */
+export function canTriggerAction(action: ActionDef, state: PlaytestState): boolean {
+  const cond = action.condition;
+  if (!cond) return true;
+  if (cond.flag && !state.flags[cond.flag]) return false;
+  // TODO: inventory-based conditions when we have an inventory system.
+  return true;
+}
 
 /**
  * Context passed to every step handler. Handlers read and mutate `state`,
@@ -107,6 +122,13 @@ const playGroupAnimation: StepHandler = () => 'continue';
 /** Stub: animating a specific actor sprite is not implemented yet. */
 const playActorAnimation: StepHandler = () => 'continue';
 
+/** Ends the adventure — shows the resolution card. Halts further steps. */
+const endAdventure: StepHandler = (step, { state }) => {
+  state.ended = true;
+  state.endMessage = (step.params.message as string | undefined) ?? null;
+  return 'halt';
+};
+
 /**
  * Central registry mapping ActionType to its handler.
  * To add a new action type: add a case to the ActionType union in shared
@@ -124,6 +146,7 @@ export const STEP_HANDLERS: Record<ActionType, StepHandler> = {
   playerInput,
   playGroupAnimation,
   playActorAnimation,
+  endAdventure,
 };
 
 /**
