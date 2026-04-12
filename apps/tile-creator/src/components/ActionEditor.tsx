@@ -38,9 +38,9 @@ const STUB_ACTIONS: ActionType[] = ['playActorAnimation'];
 export function ActionEditor({ entityId, onClose }: ActionEditorProps) {
   const scene = useEditorStore((s) => s.scene);
   const collection = useEditorStore((s) => s.currentCollection);
-  const entity = (scene.entities ?? []).find((e) => e.id === entityId);
+  const entity = (scene.entities ?? []).find((e) => e.id === entityId && e.type === 'action');
 
-  const actionRaw = entity?.properties?.action as ActionDef | undefined;
+  const actionRaw = entity?.properties?.action;
   const [action, setAction] = useState<ActionDef>(actionRaw ?? {
     trigger: 'interact',
     steps: [],

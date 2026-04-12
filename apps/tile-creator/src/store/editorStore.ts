@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { TILE_SIZE, TILEMAP_COLS, TILEMAP_ROWS } from '@storyengine/shared';
 import type { SceneJSON, TileLayer } from '@storyengine/shared';
+import { isSpawn, isExit, isNpc } from '@storyengine/shared';
 import type { EditorStore, TilesetState, Tool } from '../types/editor.js';
 import type { StoredTileset } from '../lib/assetDb.js';
 import { HISTORY_LIMIT } from './historyMiddleware.js';
@@ -877,10 +878,12 @@ export const useEditorStore = create<EditorStore>()(
         set({ scene: { ...scene, entities: entities.length > 0 ? entities : undefined } });
       },
 
-      updateEntity(id: string, patch: Partial<import('@storyengine/shared').EntityDef>) {
+      updateEntity(id: string, patch: { x?: number; y?: number; width?: number; height?: number; properties?: Record<string, unknown> }) {
         const { scene } = get();
         const entities = (scene.entities ?? []).map((e) =>
-          e.id === id ? { ...e, ...patch } : e,
+          // Spread merges all fields; type assertion preserves the discriminated
+          // union variant since `type` is never in the patch.
+          e.id === id ? { ...e, ...patch } as typeof e : e,
         );
         set({ scene: { ...scene, entities } });
       },
@@ -890,7 +893,7 @@ export const useEditorStore = create<EditorStore>()(
         const messages: import('../types/editor.js').ValidationMessage[] = [];
         const entities = scene.entities ?? [];
 
-        const spawns = entities.filter((e) => e.type === 'spawn');
+        const spawns = entities.filter(isSpawn);
         if (spawns.length === 0) {
           messages.push({ level: 'error', message: 'No player spawn point defined' });
         }
@@ -898,17 +901,17 @@ export const useEditorStore = create<EditorStore>()(
           messages.push({ level: 'warn', message: 'Multiple spawn points — only the first will be used' });
         }
 
-        const exits = entities.filter((e) => e.type === 'exit');
+        const exits = entities.filter(isExit);
         for (const exit of exits) {
           if (!exit.properties?.targetSceneId) {
             messages.push({ level: 'error', message: `Exit at (${exit.x},${exit.y}) has no target scene` });
           }
         }
 
-        const npcs = entities.filter((e) => e.type === 'npc');
+        const npcs = entities.filter(isNpc);
         for (const npc of npcs) {
-          const dialogue = npc.properties?.dialogue as unknown[];
-          if (!dialogue || !Array.isArray(dialogue) || dialogue.length === 0) {
+          const dialogue = npc.properties?.dialogue;
+          if (!dialogue || dialogue.length === 0) {
             messages.push({ level: 'warn', message: `NPC "${npc.properties?.name ?? 'unnamed'}" at (${npc.x},${npc.y}) has no dialogue` });
           }
         }

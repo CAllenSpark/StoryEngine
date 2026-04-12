@@ -3,7 +3,7 @@ import { useEditorStore } from '../store/editorStore.js';
 import { ActionEditor } from './ActionEditor.js';
 import { NpcEditor } from './NpcEditor.js';
 import type { ValidationMessage } from '../types/editor.js';
-import type { ActionDef, DialogueLine } from '@storyengine/shared';
+import { isSpawn, isExit, isNpc, isAction } from '@storyengine/shared';
 
 const SELECTED_STYLE = {
   background: 'rgba(137, 180, 250, 0.15)',
@@ -30,10 +30,10 @@ export function EntityPanel() {
     }
   }, [selectedEntityId]);
 
-  const spawns = entities.filter((e) => e.type === 'spawn');
-  const exits = entities.filter((e) => e.type === 'exit');
-  const npcs = entities.filter((e) => e.type === 'npc');
-  const actions = entities.filter((e) => e.type === 'action');
+  const spawns = entities.filter(isSpawn);
+  const exits = entities.filter(isExit);
+  const npcs = entities.filter(isNpc);
+  const actions = entities.filter(isAction);
 
   const otherScenes = collection?.scenes.filter(
     (s) => s.id !== useEditorStore.getState().currentSceneId,
@@ -62,12 +62,12 @@ export function EntityPanel() {
       const ents = s.entities ?? [];
       const prefix = `[${entry.name}]`;
 
-      if (!ents.some((e) => e.type === 'spawn')) {
+      if (!ents.some(isSpawn)) {
         msgs.push({ level: 'error', message: `${prefix} No player spawn point` });
       }
 
-      for (const exit of ents.filter((e) => e.type === 'exit')) {
-        const tid = exit.properties?.targetSceneId as string | undefined;
+      for (const exit of ents.filter(isExit)) {
+        const tid = exit.properties?.targetSceneId;
         if (!tid) {
           msgs.push({ level: 'error', message: `${prefix} Exit at (${exit.x},${exit.y}) has no target scene` });
         } else if (!collection.scenes.some((sc) => sc.id === tid)) {
@@ -89,8 +89,8 @@ export function EntityPanel() {
       visited.add(sid);
       const entry = collection.scenes.find((s) => s.id === sid);
       if (!entry) continue;
-      for (const exit of (entry.scene.entities ?? []).filter((e) => e.type === 'exit')) {
-        const tid = exit.properties?.targetSceneId as string | undefined;
+      for (const exit of (entry.scene.entities ?? []).filter(isExit)) {
+        const tid = exit.properties?.targetSceneId;
         if (tid && !visited.has(tid)) queue.push(tid);
       }
     }
@@ -126,7 +126,7 @@ export function EntityPanel() {
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#a6e3a1' }}>Spawn</div>
           {spawns.map((s) => {
-            const spriteSheetId = (s.properties?.spriteSheetId as string) ?? '';
+            const spriteSheetId = s.properties?.spriteSheetId ?? '';
             return (
               <div
                 key={s.id}
@@ -179,7 +179,7 @@ export function EntityPanel() {
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#89b4fa' }}>Exits</div>
           {exits.map((exit) => {
-            const targetId = exit.properties?.targetSceneId as string | undefined;
+            const targetId = exit.properties?.targetSceneId;
             const targetName = collection?.scenes.find((s) => s.id === targetId)?.name;
             return (
               <div
@@ -235,7 +235,7 @@ export function EntityPanel() {
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#f9e2af' }}>NPCs</div>
           {npcs.map((npc) => {
-            const dialogue = (npc.properties?.dialogue as DialogueLine[]) ?? [];
+            const dialogue = npc.properties?.dialogue ?? [];
             return (
               <div
                 key={npc.id}
@@ -247,7 +247,7 @@ export function EntityPanel() {
                   ...(selectedEntityId === npc.id ? SELECTED_STYLE : {}),
                 }}
               >
-                <span>{(npc.properties?.name as string) ?? 'NPC'} ({npc.x},{npc.y})</span>
+                <span>{npc.properties?.name ?? 'NPC'} ({npc.x},{npc.y})</span>
                 <span style={{ color: '#6c7086' }}>
                   {dialogue.length} line{dialogue.length !== 1 ? 's' : ''}
                 </span>
@@ -277,7 +277,7 @@ export function EntityPanel() {
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#cba6f7' }}>Actions</div>
           {actions.map((act) => {
-            const actionDef = act.properties?.action as ActionDef | undefined;
+            const actionDef = act.properties?.action;
             const stepCount = actionDef?.steps?.length ?? 0;
             const triggerLabel = actionDef?.trigger ?? 'interact';
             return (

@@ -53,15 +53,18 @@ export interface GroupAnimation {
   layer: number;
 }
 
-export interface EntityDef {
+export interface EntityBase {
   id: string;
-  type: 'spawn' | 'npc' | 'exit' | 'action';
   x: number;
   y: number;
   width?: number;
   height?: number;
-  properties?: Record<string, unknown>;
 }
+
+/** Entity types for discriminated union — used for narrowing via `entity.type`. */
+export type EntityType = 'spawn' | 'npc' | 'exit' | 'action';
+
+// EntityDef is defined below ActionDef / DialogueLine as a discriminated union.
 
 export type ActionTrigger = 'step' | 'interact' | 'auto' | 'conditional';
 
@@ -96,6 +99,58 @@ export interface DialogueLine {
   speaker: string;
   text: string;
 }
+
+// ── Entity discriminated union ──────────────────────────────────────
+
+export interface SpawnEntity extends EntityBase {
+  type: 'spawn';
+  properties?: {
+    spriteSheetId?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface NpcEntity extends EntityBase {
+  type: 'npc';
+  properties?: {
+    name?: string;
+    dialogue?: DialogueLine[];
+    spriteSheetId?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface ExitEntity extends EntityBase {
+  type: 'exit';
+  properties?: {
+    targetSceneId?: string;
+    spawnX?: number;
+    spawnY?: number;
+    [key: string]: unknown;
+  };
+}
+
+export interface ActionEntity extends EntityBase {
+  type: 'action';
+  properties?: {
+    action?: ActionDef;
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * Scene entity — discriminated union by `type`.
+ * TypeScript narrows `entity.properties` automatically when you check `entity.type`.
+ * The `[key: string]: unknown` escape hatch preserves forward compatibility with
+ * future fields while giving known fields proper typing.
+ */
+export type EntityDef = SpawnEntity | NpcEntity | ExitEntity | ActionEntity;
+
+// Type predicates for filter() narrowing.
+export const isSpawn = (e: EntityDef): e is SpawnEntity => e.type === 'spawn';
+export const isNpc = (e: EntityDef): e is NpcEntity => e.type === 'npc';
+export const isExit = (e: EntityDef): e is ExitEntity => e.type === 'exit';
+export const isAction = (e: EntityDef): e is ActionEntity => e.type === 'action';
 
 // ── Sprite animation types ──────────────────────────────────────────
 

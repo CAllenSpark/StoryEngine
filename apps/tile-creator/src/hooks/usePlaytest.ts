@@ -1,59 +1,15 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { GameLoop, InputManager, loadTilemap } from '@storyengine/engine';
-import type { SceneJSON, EntityDef, DialogueLine, ActionDef, SpriteSheetDef, SpriteAnimState } from '@storyengine/shared';
+import type { SceneJSON, EntityDef, ActionDef, SpriteSheetDef, ActionEntity } from '@storyengine/shared';
+import { isSpawn } from '@storyengine/shared';
 import { decodeTransform } from '../lib/transformUtils.js';
+import type { PlaytestState, MediaOverlay } from './playtest/types.js';
+import type { LoadedSpriteSheet, ActorAnim } from './playtest/actorAnimations.js';
+import { loadSpriteSheet, resolveActorState, advanceActorAnim } from './playtest/actorAnimations.js';
+import { runActionSteps, type StepHandlerContext } from './playtest/actionHandlers.js';
 
-/** Loaded sprite sheet with image and state lookup map. */
-interface LoadedSpriteSheet {
-  def: SpriteSheetDef;
-  image: HTMLImageElement;
-  stateMap: Map<string, SpriteAnimState>;
-}
-
-/** Per-actor animation state during playtest. */
-interface ActorAnim {
-  stateName: string;
-  frame: number;
-  accumMs: number;
-}
-
-export interface MediaOverlay {
-  type: 'video' | 'audio' | 'image' | 'slideshow' | 'playerInput';
-  url?: string;
-  urls?: string[];
-  loop?: boolean;
-  duration?: number;
-  interval?: number;
-  prompt?: string;
-  options?: string[];
-  startedAt: number;
-}
-
-export interface PlaytestState {
-  /** Player position in pixels */
-  px: number;
-  py: number;
-  /** Player facing */
-  facing: 'down' | 'up' | 'left' | 'right';
-  /** Current scene ID */
-  sceneId: string;
-  /** Active dialogue lines to display */
-  dialogue: DialogueLine[] | null;
-  /** Current dialogue line index */
-  dialogueIndex: number;
-  /** Whether playtest is running */
-  running: boolean;
-  /** Set of one-shot action IDs that have fired */
-  firedActions: Set<string>;
-  /** Player state flags (from changePlayerState actions) */
-  flags: Record<string, unknown>;
-  /** Active media overlay (video, image, slideshow, etc.) */
-  media: MediaOverlay | null;
-  /** Active audio (plays in background, doesn't block movement) */
-  audio: { url: string; loop: boolean } | null;
-  /** Last playerInput choice */
-  lastChoice: string | null;
-}
+// Re-export types for consumers
+export type { PlaytestState, MediaOverlay };
 
 interface PlaytestConfig {
   collection: {
@@ -91,47 +47,20 @@ export function usePlaytest(config: PlaytestConfig) {
     onStateChange({ ...stateRef.current });
   }, [onStateChange]);
 
-  /** Resolve the best animation state for an actor given movement + facing. */
-  const resolveActorState = useCallback((
-    sheet: LoadedSpriteSheet,
-    facing: 'down' | 'up' | 'left' | 'right',
-    isMoving: boolean,
-  ): string => {
-    const prefix = isMoving ? 'walk' : 'idle';
-    const desired = `${prefix}-${facing}`;
-    if (sheet.stateMap.has(desired)) return desired;
-    // Fallback: try the other mode for this facing
-    const alt = `${isMoving ? 'idle' : 'walk'}-${facing}`;
-    if (sheet.stateMap.has(alt)) return alt;
-    // Fallback: default state
-    return sheet.def.defaultState;
-  }, []);
-
-  /** Advance the animation frame counter for an actor. */
-  const advanceActorAnim = useCallback((
+  /**
+   * Map-backed wrapper around the pure `advanceActorAnim` helper.
+   * Keeps the per-entity Map lookup out of the pure module.
+   */
+  const tickActorAnim = useCallback((
     entityId: string,
     sheet: LoadedSpriteSheet,
     desiredState: string,
     dt: number,
   ): ActorAnim => {
-    let anim = actorAnimsRef.current.get(entityId);
-    if (!anim || anim.stateName !== desiredState) {
-      anim = { stateName: desiredState, frame: 0, accumMs: 0 };
-      actorAnimsRef.current.set(entityId, anim);
-    }
-    const state = sheet.stateMap.get(desiredState);
-    if (!state || state.frameCount <= 1) return anim;
-    anim.accumMs += dt;
-    const frameDuration = 1000 / state.fps;
-    while (anim.accumMs >= frameDuration) {
-      anim.accumMs -= frameDuration;
-      anim.frame++;
-      if (anim.frame >= state.frameCount) {
-        anim.frame = state.loop !== false ? 0 : state.frameCount - 1;
-        if (state.loop === false) break;
-      }
-    }
-    return anim;
+    const current = actorAnimsRef.current.get(entityId);
+    const next = advanceActorAnim(current, sheet, desiredState, dt);
+    actorAnimsRef.current.set(entityId, next);
+    return next;
   }, []);
 
   const loadScene = useCallback((sceneId: string, spawnX?: number, spawnY?: number) => {
@@ -143,7 +72,7 @@ export function usePlaytest(config: PlaytestConfig) {
     sceneRef.current = scene;
 
     // Find spawn point
-    const spawn = scene.entities?.find((e) => e.type === 'spawn');
+    const spawn = scene.entities?.find(isSpawn);
     const sx = spawnX ?? spawn?.x ?? 0;
     const sy = spawnY ?? spawn?.y ?? 0;
 
@@ -158,7 +87,7 @@ export function usePlaytest(config: PlaytestConfig) {
     const entities = scene.entities ?? [];
     for (const ent of entities) {
       if (ent.type !== 'action') continue;
-      const action = ent.properties?.action as ActionDef | undefined;
+      const action = ent.properties?.action;
       if (!action || action.trigger !== 'auto') continue;
       if (action.oneShot && stateRef.current.firedActions.has(ent.id)) continue;
       executeAction(ent, action);
@@ -167,112 +96,37 @@ export function usePlaytest(config: PlaytestConfig) {
     notify();
   }, [collection, notify]);
 
-  const executeAction = useCallback((entity: EntityDef, action: ActionDef) => {
-    if (action.oneShot) {
-      stateRef.current.firedActions.add(entity.id);
-    }
-
-    // Process steps sequentially — blocking overlays pause further steps
-    for (const step of action.steps) {
-      switch (step.type) {
-        case 'showDialogue': {
-          const lines = step.params.lines as DialogueLine[] | undefined;
-          if (lines && lines.length > 0) {
-            stateRef.current.dialogue = lines;
-            stateRef.current.dialogueIndex = 0;
-          }
-          break;
-        }
-        case 'changeScene': {
-          const targetSceneId = step.params.targetSceneId as string;
-          const sx = (step.params.spawnX as number) ?? 0;
-          const sy = (step.params.spawnY as number) ?? 0;
-          if (targetSceneId) {
-            // Defer to next microtask — avoids mutating scene state mid-iteration
-            setTimeout(() => loadScene(targetSceneId, sx, sy), 0);
-          }
-          return; // Stop processing further steps after scene change
-        }
-        case 'changePlayerState': {
-          const flag = step.params.flag as string;
-          const value = step.params.value;
-          if (flag) stateRef.current.flags[flag] = value;
-          break;
-        }
-        case 'playVideo': {
-          stateRef.current.media = {
-            type: 'video',
-            url: step.params.url as string,
-            startedAt: Date.now(),
-          };
-          break;
-        }
-        case 'playAudio': {
-          stateRef.current.audio = {
-            url: step.params.url as string,
-            loop: (step.params.loop as boolean) ?? false,
-          };
-          break;
-        }
-        case 'stopAudio': {
-          stateRef.current.audio = null;
-          break;
-        }
-        case 'showImage': {
-          stateRef.current.media = {
-            type: 'image',
-            url: step.params.url as string,
-            duration: (step.params.duration as number) ?? 3000,
-            startedAt: Date.now(),
-          };
-          break;
-        }
-        case 'showSlideshow': {
-          stateRef.current.media = {
-            type: 'slideshow',
-            urls: (step.params.images as string[]) ?? [],
-            interval: (step.params.interval as number) ?? 2000,
-            startedAt: Date.now(),
-          };
-          break;
-        }
-        case 'playerInput': {
-          stateRef.current.media = {
-            type: 'playerInput',
-            prompt: (step.params.prompt as string) ?? 'What do you do?',
-            options: (step.params.options as string[]) ?? [],
-            startedAt: Date.now(),
-          };
-          break;
-        }
-        case 'playGroupAnimation': {
-          // Group animations play automatically via tilemap — no runtime action needed
-          break;
-        }
-        case 'playActorAnimation': {
-          // Stub — would animate an NPC/actor sprite
-          break;
-        }
-      }
-    }
+  const executeAction = useCallback((entity: ActionEntity, action: ActionDef) => {
+    if (action.oneShot) stateRef.current.firedActions.add(entity.id);
+    const ctx: StepHandlerContext = {
+      state: stateRef.current,
+      requestSceneChange: (sceneId, sx, sy) => {
+        // Defer to next microtask — avoids mutating scene state mid-iteration.
+        setTimeout(() => loadScene(sceneId, sx, sy), 0);
+      },
+    };
+    runActionSteps(action.steps, ctx);
     notify();
   }, [loadScene, notify]);
 
-  const findNearbyEntity = useCallback((type: string, maxRadius?: number): EntityDef | null => {
+  const findNearbyEntity = useCallback(<T extends EntityDef['type']>(
+    type: T,
+    maxRadius?: number,
+  ): Extract<EntityDef, { type: T }> | null => {
     const scene = sceneRef.current;
     if (!scene) return null;
     const ts = scene.tileSize;
     const playerTileX = Math.floor(stateRef.current.px / ts);
     const playerTileY = Math.floor(stateRef.current.py / ts);
 
-    let best: EntityDef | null = null;
+    let best: Extract<EntityDef, { type: T }> | null = null;
     let bestDist = Infinity;
     for (const ent of scene.entities ?? []) {
       if (ent.type !== type) continue;
       // Per-entity radius: action entities use their ActionDef radius, others use 0 (same tile)
       let radius = 0;
       if (ent.type === 'action') {
-        const action = ent.properties?.action as ActionDef | undefined;
+        const action = ent.properties?.action;
         radius = action?.radius ?? 0;
       } else if (ent.type === 'npc') {
         radius = 1; // NPCs: interact when adjacent
@@ -282,7 +136,8 @@ export function usePlaytest(config: PlaytestConfig) {
       const dy = Math.abs(ent.y - playerTileY);
       const dist = Math.max(dx, dy); // Chebyshev distance
       if (dist <= radius && dist < bestDist) {
-        best = ent;
+        // Cast is safe: we checked `ent.type !== type` above and continue if so.
+        best = ent as Extract<EntityDef, { type: T }>;
         bestDist = dist;
       }
     }
@@ -315,7 +170,7 @@ export function usePlaytest(config: PlaytestConfig) {
     // Try NPC interaction
     const npc = findNearbyEntity('npc');
     if (npc) {
-      const dialogue = npc.properties?.dialogue as DialogueLine[] | undefined;
+      const dialogue = npc.properties?.dialogue;
       if (dialogue && dialogue.length > 0) {
         stateRef.current.dialogue = dialogue;
         stateRef.current.dialogueIndex = 0;
@@ -327,7 +182,7 @@ export function usePlaytest(config: PlaytestConfig) {
     // Try action tile interaction
     const actionEntity = findNearbyEntity('action');
     if (actionEntity) {
-      const action = actionEntity.properties?.action as ActionDef | undefined;
+      const action = actionEntity.properties?.action;
       if (!action || action.trigger !== 'interact') return;
       if (action.oneShot && stateRef.current.firedActions.has(actionEntity.id)) return;
       executeAction(actionEntity, action);
@@ -345,14 +200,10 @@ export function usePlaytest(config: PlaytestConfig) {
     actorAnimsRef.current.clear();
 
     // Preload sprite sheets into the cache (async, but we start the loop anyway
-    // since rendering gracefully falls back to the placeholder while loading)
+    // since rendering gracefully falls back to the placeholder while loading).
     spriteSheetsRef.current.clear();
     for (const sheet of spriteSheets) {
-      const img = new Image();
-      img.src = sheet.dataUrl;
-      const stateMap = new Map(sheet.def.states.map((s) => [s.name, s]));
-      const loaded: LoadedSpriteSheet = { def: sheet.def, image: img, stateMap };
-      spriteSheetsRef.current.set(sheet.id, loaded);
+      spriteSheetsRef.current.set(sheet.id, loadSpriteSheet(sheet.def, sheet.dataUrl));
     }
 
     loadScene(collection.scenes[0].id);
@@ -430,7 +281,7 @@ export function usePlaytest(config: PlaytestConfig) {
         const playerTileY = Math.floor(s.py / ts);
         for (const ent of scene.entities ?? []) {
           if (ent.type !== 'action') continue;
-          const action = ent.properties?.action as ActionDef | undefined;
+          const action = ent.properties?.action;
           if (!action || action.trigger !== 'step') continue;
           if (ent.x === playerTileX && ent.y === playerTileY) {
             if (action.oneShot && s.firedActions.has(ent.id)) continue;
@@ -445,10 +296,10 @@ export function usePlaytest(config: PlaytestConfig) {
           const eh = ent.height ?? 1;
           if (playerTileX >= ent.x && playerTileX < ent.x + ew &&
               playerTileY >= ent.y && playerTileY < ent.y + eh) {
-            const targetId = ent.properties?.targetSceneId as string | undefined;
+            const targetId = ent.properties?.targetSceneId;
             if (targetId) {
-              const spawnX = (ent.properties?.spawnX as number) ?? undefined;
-              const spawnY = (ent.properties?.spawnY as number) ?? undefined;
+              const spawnX = ent.properties?.spawnX;
+              const spawnY = ent.properties?.spawnY;
               loadScene(targetId, spawnX, spawnY);
               break;
             }
@@ -459,27 +310,27 @@ export function usePlaytest(config: PlaytestConfig) {
         tilemap.updateAnimations(dt);
 
         // Update sprite animations — player
-        const spawn = scene.entities?.find((e) => e.type === 'spawn');
-        const playerSheetId = spawn?.properties?.spriteSheetId as string | undefined;
+        const spawn = scene.entities?.find(isSpawn);
+        const playerSheetId = spawn?.properties?.spriteSheetId;
         if (playerSheetId) {
           const sheet = spriteSheetsRef.current.get(playerSheetId);
           if (sheet) {
             const playerIsMoving = move.x !== 0 || move.y !== 0;
             const stateName = resolveActorState(sheet, s.facing, playerIsMoving);
-            advanceActorAnim('player', sheet, stateName, dt);
+            tickActorAnim('player', sheet, stateName, dt);
           }
         }
         // NPCs (currently idle only — NPCs don't move yet)
         for (const ent of scene.entities ?? []) {
           if (ent.type !== 'npc') continue;
-          const npcSheetId = ent.properties?.spriteSheetId as string | undefined;
+          const npcSheetId = ent.properties?.spriteSheetId;
           if (!npcSheetId) continue;
           const sheet = spriteSheetsRef.current.get(npcSheetId);
           if (!sheet) continue;
           const stateName = sheet.stateMap.has('idle-down')
             ? 'idle-down'
             : sheet.def.defaultState;
-          advanceActorAnim(ent.id, sheet, stateName, dt);
+          tickActorAnim(ent.id, sheet, stateName, dt);
         }
 
         input.endFrame();
@@ -542,7 +393,7 @@ export function usePlaytest(config: PlaytestConfig) {
         // Draw NPCs — sprite if assigned, else yellow dot placeholder
         for (const ent of scene.entities ?? []) {
           if (ent.type !== 'npc') continue;
-          const npcSheetId = ent.properties?.spriteSheetId as string | undefined;
+          const npcSheetId = ent.properties?.spriteSheetId;
           const npcSheet = npcSheetId ? spriteSheetsRef.current.get(npcSheetId) : undefined;
           const ex = (ent.x * ts + ts / 2) * scale;
           const ey = (ent.y * ts + ts / 2) * scale;
@@ -584,10 +435,7 @@ export function usePlaytest(config: PlaytestConfig) {
         // Draw player — sprite if assigned, else green-square placeholder
         const playerPx = s.px * scale;
         const playerPy = s.py * scale;
-        const playerSheetId = (() => {
-          const spawn = scene.entities?.find((e) => e.type === 'spawn');
-          return spawn?.properties?.spriteSheetId as string | undefined;
-        })();
+        const playerSheetId = scene.entities?.find(isSpawn)?.properties?.spriteSheetId;
         const playerSheet = playerSheetId
           ? spriteSheetsRef.current.get(playerSheetId)
           : undefined;
@@ -685,7 +533,7 @@ export function usePlaytest(config: PlaytestConfig) {
     loopRef.current = loop;
     loop.start();
     notify();
-  }, [collection, tileImages, spriteSheets, canvasRef, scale, loadScene, handleInteract, executeAction, resolveActorState, advanceActorAnim, notify]);
+  }, [collection, tileImages, spriteSheets, canvasRef, scale, loadScene, handleInteract, executeAction, tickActorAnim, notify]);
 
   const stop = useCallback(() => {
     loopRef.current?.stop();

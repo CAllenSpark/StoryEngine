@@ -9,19 +9,19 @@ interface NpcEditorProps {
 
 export function NpcEditor({ entityId, onClose }: NpcEditorProps) {
   const entity = useEditorStore((s) =>
-    (s.scene.entities ?? []).find((e) => e.id === entityId),
+    (s.scene.entities ?? []).find((e) => e.id === entityId && e.type === 'npc'),
   );
 
   const spriteSheetLibrary = useEditorStore((s) => s.spriteSheetLibrary);
 
   const [name, setName] = useState<string>(
-    (entity?.properties?.name as string) ?? 'NPC',
+    entity?.properties?.name ?? 'NPC',
   );
   const [lines, setLines] = useState<DialogueLine[]>(
-    (entity?.properties?.dialogue as DialogueLine[]) ?? [],
+    entity?.properties?.dialogue ?? [],
   );
   const [spriteSheetId, setSpriteSheetId] = useState<string>(
-    (entity?.properties?.spriteSheetId as string) ?? '',
+    entity?.properties?.spriteSheetId ?? '',
   );
 
   if (!entity) return null;

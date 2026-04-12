@@ -1,4 +1,4 @@
-import type { SceneJSON, SceneCollection, TilesetRef, AnimationPhase, GroupAnimationPhase, GroupAnimation, EntityDef, SpriteSheetDef } from '@storyengine/shared';
+import type { SceneJSON, SceneCollection, TilesetRef, AnimationPhase, GroupAnimationPhase, GroupAnimation, SpriteSheetDef } from '@storyengine/shared';
 import type { StoredTileset, StoredSpriteSheet } from '../lib/assetDb.js';
 
 export type Tool = 'paint' | 'erase' | 'select' | 'colorPaint';
@@ -163,7 +163,7 @@ export interface EditorActions {
   addNpc: (x: number, y: number) => void;
   addAction: (x: number, y: number) => void;
   removeEntity: (id: string) => void;
-  updateEntity: (id: string, patch: Partial<EntityDef>) => void;
+  updateEntity: (id: string, patch: { x?: number; y?: number; width?: number; height?: number; properties?: Record<string, unknown> }) => void;
   validateScene: () => ValidationMessage[];
 }
 
