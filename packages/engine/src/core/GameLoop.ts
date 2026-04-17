@@ -12,6 +12,8 @@ export interface GameLoopCallbacks {
 export class GameLoop {
   private readonly clock = new Clock();
   private readonly fixedDt: number;
+  private readonly maxAccumulator: number;
+  private readonly boundFrame: (timestamp: number) => void;
   private accumulator = 0;
   private rafId = 0;
   private _running = false;
@@ -21,6 +23,10 @@ export class GameLoop {
     fixedHz = 60,
   ) {
     this.fixedDt = 1000 / fixedHz;
+    // Cap at 5 ticks of catch-up to prevent spiral-of-death after tab blur.
+    this.maxAccumulator = this.fixedDt * 5;
+    // Bind once — avoids creating a new closure every frame.
+    this.boundFrame = this.frame.bind(this);
   }
 
   get running(): boolean {
@@ -32,7 +38,7 @@ export class GameLoop {
     this._running = true;
     this.clock.reset();
     this.accumulator = 0;
-    this.rafId = requestAnimationFrame((t) => this.frame(t));
+    this.rafId = requestAnimationFrame(this.boundFrame);
   }
 
   stop(): void {
@@ -47,7 +53,7 @@ export class GameLoop {
     if (!this._running) return;
 
     const delta = this.clock.tick(timestamp);
-    this.accumulator += delta;
+    this.accumulator = Math.min(this.accumulator + delta, this.maxAccumulator);
 
     // Fixed-timestep logic updates
     while (this.accumulator >= this.fixedDt) {
@@ -59,6 +65,6 @@ export class GameLoop {
     const interpolation = this.accumulator / this.fixedDt;
     this.callbacks.render(interpolation);
 
-    this.rafId = requestAnimationFrame((t) => this.frame(t));
+    this.rafId = requestAnimationFrame(this.boundFrame);
   }
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { GameLoop, InputManager, loadTilemap } from '@storyengine/engine';
 import type { SceneJSON, EntityDef, ActionDef, SpriteSheetDef, ActionEntity } from '@storyengine/shared';
-import { isSpawn } from '@storyengine/shared';
+import { isSpawn, isExit, isNpc, isAction } from '@storyengine/shared';
 import { decodeTransform } from '../lib/transformUtils.js';
 import type { PlaytestState, MediaOverlay } from './playtest/types.js';
 import type { LoadedSpriteSheet, ActorAnim } from './playtest/actorAnimations.js';
@@ -41,6 +41,14 @@ export function usePlaytest(config: PlaytestConfig) {
   const spriteSheetsRef = useRef<Map<string, LoadedSpriteSheet>>(new Map());
   /** Per-entity animation state, keyed by entity ID ('player' for the player). */
   const actorAnimsRef = useRef<Map<string, ActorAnim>>(new Map());
+  /** Pre-bucketed entity refs — populated once per loadScene, avoid per-frame scans. */
+  const spawnRef = useRef<import('@storyengine/shared').SpawnEntity | null>(null);
+  const exitsRef = useRef<import('@storyengine/shared').ExitEntity[]>([]);
+  const npcsRef = useRef<import('@storyengine/shared').NpcEntity[]>([]);
+  const stepActionsRef = useRef<import('@storyengine/shared').ActionEntity[]>([]);
+  const autoActionsRef = useRef<import('@storyengine/shared').ActionEntity[]>([]);
+  /** Deferred scene change from executeAction — applied at top of next update. */
+  const pendingSceneChangeRef = useRef<{ sceneId: string; sx?: number; sy?: number } | null>(null);
 
   const { collection, tileImages, spriteSheets, canvasRef, onStateChange, scale = 3 } = config;
 
@@ -72,11 +80,19 @@ export function usePlaytest(config: PlaytestConfig) {
     tilemapRef.current = tilemap;
     sceneRef.current = scene;
 
-    // Find spawn point
-    const spawn = scene.entities?.find(isSpawn);
+    // Pre-bucket entities once — avoids per-frame linear scans.
+    const entities = scene.entities ?? [];
+    const spawn = entities.find(isSpawn) ?? null;
+    spawnRef.current = spawn;
+    exitsRef.current = entities.filter(isExit);
+    npcsRef.current = entities.filter(isNpc);
+    const actions = entities.filter(isAction);
+    stepActionsRef.current = actions.filter((a) => a.properties?.action?.trigger === 'step');
+    autoActionsRef.current = actions.filter((a) => a.properties?.action?.trigger === 'auto');
+
+    // Position player at spawn
     const sx = spawnX ?? spawn?.x ?? 0;
     const sy = spawnY ?? spawn?.y ?? 0;
-
     stateRef.current.sceneId = sceneId;
     stateRef.current.px = sx * scene.tileSize + scene.tileSize / 2;
     stateRef.current.py = sy * scene.tileSize + scene.tileSize / 2;
@@ -85,11 +101,9 @@ export function usePlaytest(config: PlaytestConfig) {
     stateRef.current.media = null;
 
     // Fire auto-trigger actions
-    const entities = scene.entities ?? [];
-    for (const ent of entities) {
-      if (ent.type !== 'action') continue;
+    for (const ent of autoActionsRef.current) {
       const action = ent.properties?.action;
-      if (!action || action.trigger !== 'auto') continue;
+      if (!action) continue;
       if (action.oneShot && stateRef.current.firedActions.has(ent.id)) continue;
       if (!canTriggerAction(action, stateRef.current)) continue;
       executeAction(ent, action);
@@ -103,8 +117,8 @@ export function usePlaytest(config: PlaytestConfig) {
     const ctx: StepHandlerContext = {
       state: stateRef.current,
       requestSceneChange: (sceneId, sx, sy) => {
-        // Defer to next microtask — avoids mutating scene state mid-iteration.
-        setTimeout(() => loadScene(sceneId, sx, sy), 0);
+        // Defer to top of next update tick — same frame, no macrotask hop.
+        pendingSceneChangeRef.current = { sceneId, sx, sy };
       },
     };
     runActionSteps(action.steps, ctx);
@@ -196,6 +210,10 @@ export function usePlaytest(config: PlaytestConfig) {
   const start = useCallback(() => {
     if (collection.scenes.length === 0) return;
 
+    // Guard: stop any existing loop to prevent leaking a dangling rAF cycle.
+    if (loopRef.current) loopRef.current.stop();
+    inputRef.current?.destroy();
+
     inputRef.current = new InputManager(window);
     stateRef.current.running = true;
     stateRef.current.firedActions = new Set();
@@ -220,6 +238,15 @@ export function usePlaytest(config: PlaytestConfig) {
         const scene = sceneRef.current;
         const input = inputRef.current;
         if (!tilemap || !scene || !input) return;
+
+        // Apply deferred scene change from the previous tick's executeAction.
+        const pending = pendingSceneChangeRef.current;
+        if (pending) {
+          pendingSceneChangeRef.current = null;
+          loadScene(pending.sceneId, pending.sx, pending.sy);
+          input.endFrame();
+          return;
+        }
 
         // Adventure is over — no input processing until restart
         if (s.ended) { input.endFrame(); return; }
@@ -284,13 +311,12 @@ export function usePlaytest(config: PlaytestConfig) {
           }
         }
 
-        // Check step-trigger actions
+        // Check step-trigger actions (pre-bucketed at loadScene)
         const playerTileX = Math.floor(s.px / ts);
         const playerTileY = Math.floor(s.py / ts);
-        for (const ent of scene.entities ?? []) {
-          if (ent.type !== 'action') continue;
+        for (const ent of stepActionsRef.current) {
           const action = ent.properties?.action;
-          if (!action || action.trigger !== 'step') continue;
+          if (!action) continue;
           if (ent.x === playerTileX && ent.y === playerTileY) {
             if (action.oneShot && s.firedActions.has(ent.id)) continue;
             if (!canTriggerAction(action, s)) continue;
@@ -298,29 +324,25 @@ export function usePlaytest(config: PlaytestConfig) {
           }
         }
 
-        // Check exit zones
-        for (const ent of scene.entities ?? []) {
-          if (ent.type !== 'exit') continue;
-          const ew = ent.width ?? 1;
-          const eh = ent.height ?? 1;
-          if (playerTileX >= ent.x && playerTileX < ent.x + ew &&
-              playerTileY >= ent.y && playerTileY < ent.y + eh) {
-            const targetId = ent.properties?.targetSceneId;
+        // Check exit zones (pre-bucketed at loadScene)
+        for (const exit of exitsRef.current) {
+          const ew = exit.width ?? 1;
+          const eh = exit.height ?? 1;
+          if (playerTileX >= exit.x && playerTileX < exit.x + ew &&
+              playerTileY >= exit.y && playerTileY < exit.y + eh) {
+            const targetId = exit.properties?.targetSceneId;
             if (targetId) {
-              const spawnX = ent.properties?.spawnX;
-              const spawnY = ent.properties?.spawnY;
-              loadScene(targetId, spawnX, spawnY);
+              loadScene(targetId, exit.properties?.spawnX, exit.properties?.spawnY);
               break;
             }
           }
         }
 
-        // Update tile animations
-        tilemap.updateAnimations(dt);
+        // Update tile animations (skip if scene has none)
+        if (tilemap.hasAnimations) tilemap.updateAnimations(dt);
 
-        // Update sprite animations — player
-        const spawn = scene.entities?.find(isSpawn);
-        const playerSheetId = spawn?.properties?.spriteSheetId;
+        // Update sprite animations — player (cached spawn ref)
+        const playerSheetId = spawnRef.current?.properties?.spriteSheetId;
         if (playerSheetId) {
           const sheet = spriteSheetsRef.current.get(playerSheetId);
           if (sheet) {
@@ -329,17 +351,16 @@ export function usePlaytest(config: PlaytestConfig) {
             tickActorAnim('player', sheet, stateName, dt);
           }
         }
-        // NPCs (currently idle only — NPCs don't move yet)
-        for (const ent of scene.entities ?? []) {
-          if (ent.type !== 'npc') continue;
-          const npcSheetId = ent.properties?.spriteSheetId;
+        // NPCs (pre-bucketed at loadScene)
+        for (const npc of npcsRef.current) {
+          const npcSheetId = npc.properties?.spriteSheetId;
           if (!npcSheetId) continue;
           const sheet = spriteSheetsRef.current.get(npcSheetId);
           if (!sheet) continue;
           const stateName = sheet.stateMap.has('idle-down')
             ? 'idle-down'
             : sheet.def.defaultState;
-          tickActorAnim(ent.id, sheet, stateName, dt);
+          tickActorAnim(npc.id, sheet, stateName, dt);
         }
 
         input.endFrame();
@@ -356,12 +377,14 @@ export function usePlaytest(config: PlaytestConfig) {
         if (!tilemap || !scene) return;
 
         const ts = scene.tileSize;
-        const renderW = scene.width * ts;
-        const renderH = scene.height * ts;
+        const wantW = scene.width * ts * scale;
+        const wantH = scene.height * ts * scale;
 
-        canvas.width = renderW * scale;
-        canvas.height = renderH * scale;
-        ctx.imageSmoothingEnabled = false;
+        if (canvas.width !== wantW || canvas.height !== wantH) {
+          canvas.width = wantW;
+          canvas.height = wantH;
+          ctx.imageSmoothingEnabled = false;
+        }
 
         ctx.fillStyle = '#0e0e1a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -400,8 +423,7 @@ export function usePlaytest(config: PlaytestConfig) {
         }
 
         // Draw NPCs — sprite if assigned, else yellow dot placeholder
-        for (const ent of scene.entities ?? []) {
-          if (ent.type !== 'npc') continue;
+        for (const ent of npcsRef.current) {
           const npcSheetId = ent.properties?.spriteSheetId;
           const npcSheet = npcSheetId ? spriteSheetsRef.current.get(npcSheetId) : undefined;
           const ex = (ent.x * ts + ts / 2) * scale;
@@ -444,7 +466,7 @@ export function usePlaytest(config: PlaytestConfig) {
         // Draw player — sprite if assigned, else green-square placeholder
         const playerPx = s.px * scale;
         const playerPy = s.py * scale;
-        const playerSheetId = scene.entities?.find(isSpawn)?.properties?.spriteSheetId;
+        const playerSheetId = spawnRef.current?.properties?.spriteSheetId;
         const playerSheet = playerSheetId
           ? spriteSheetsRef.current.get(playerSheetId)
           : undefined;
