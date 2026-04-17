@@ -44,6 +44,11 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
   const rafRef = useRef<number>(0);
   const selectionStartRef = useRef<{ x: number; y: number } | null>(null);
   const isDraggingSelectionRef = useRef(false);
+  // Cache: migrated animations Map keyed on rawAnims identity — avoid rebuilding every frame.
+  const animCacheRef = useRef<{
+    raw: Record<string, unknown> | undefined;
+    map: Map<string, TileAnimation> | null;
+  }>({ raw: undefined, map: null });
 
   const scheduleRender = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
@@ -55,15 +60,19 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
 
       const state = useEditorStore.getState();
       const { scene, layerVisibility, zoom, tileset, selectionBounds, clipboard, activeTool, animClock } = state;
-      // Pre-migrate animations once per render (not per-tile)
+      // Migrate animations once per tileset change (cached by identity).
       const rawAnims = tileset?.ref.animations;
-      let migratedAnims: Map<string, TileAnimation> | null = null;
-      if (rawAnims) {
-        migratedAnims = new Map();
-        for (const [key, raw] of Object.entries(rawAnims)) {
-          migratedAnims.set(key, migrateTileAnimation(raw));
+      if (animCacheRef.current.raw !== rawAnims) {
+        let map: Map<string, TileAnimation> | null = null;
+        if (rawAnims) {
+          map = new Map();
+          for (const [key, raw] of Object.entries(rawAnims)) {
+            map.set(key, migrateTileAnimation(raw));
+          }
         }
+        animCacheRef.current = { raw: rawAnims, map };
       }
+      const migratedAnims = animCacheRef.current.map;
       const ts = scene.tileSize;
       const w = scene.width * ts * zoom;
       const h = scene.height * ts * zoom;

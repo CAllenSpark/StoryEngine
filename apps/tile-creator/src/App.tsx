@@ -1,6 +1,7 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useEditorStore } from './store/editorStore.js';
 import { useTemporalStore } from './store/temporal.js';
+import { useAutosave, formatTimeSince } from './hooks/useAutosave.js';
 import { Toolbar } from './components/Toolbar.js';
 import { GameToolbar } from './components/GameToolbar.js';
 import { TilesetPanel } from './components/TilesetPanel.js';
@@ -18,6 +19,15 @@ export function App() {
   const { undo, redo } = useTemporalStore();
   const editorMode = useEditorStore((s) => s.editorMode);
   const setEditorMode = useEditorStore((s) => s.setEditorMode);
+  const { status: saveStatus, lastSavedAt } = useAutosave();
+  const [, forceUpdate] = useState(0);
+
+  // Re-render the "Xs ago" text periodically
+  useEffect(() => {
+    if (!lastSavedAt) return;
+    const interval = setInterval(() => forceUpdate((n) => n + 1), 10000);
+    return () => clearInterval(interval);
+  }, [lastSavedAt]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -114,6 +124,22 @@ export function App() {
           Game Mode
         </button>
         <span style={{ marginLeft: 8, fontSize: 10, color: '#6c7086' }}>Tab to switch</span>
+        <span style={{
+          marginLeft: 'auto', marginRight: 8,
+          fontSize: 10, padding: '1px 8px', borderRadius: 4,
+          background: saveStatus === 'error' ? 'rgba(243,139,168,0.2)' : 'rgba(166,227,161,0.1)',
+          color: saveStatus === 'unsaved' ? '#f9e2af'
+            : saveStatus === 'saving' ? '#89b4fa'
+            : saveStatus === 'error' ? '#f38ba8'
+            : saveStatus === 'saved' ? '#a6e3a1'
+            : '#6c7086',
+        }}>
+          {saveStatus === 'unsaved' && 'Unsaved changes'}
+          {saveStatus === 'saving' && 'Saving...'}
+          {saveStatus === 'error' && 'Save failed'}
+          {saveStatus === 'saved' && `Saved ${formatTimeSince(lastSavedAt) ?? ''}`}
+          {saveStatus === 'idle' && (lastSavedAt ? `Saved ${formatTimeSince(lastSavedAt) ?? ''}` : '')}
+        </span>
       </div>
 
       {editorMode === 'art' ? <Toolbar /> : <GameToolbar />}
