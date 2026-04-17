@@ -117,8 +117,23 @@ export function usePlaytest(config: PlaytestConfig) {
     const ctx: StepHandlerContext = {
       state: stateRef.current,
       requestSceneChange: (sceneId, sx, sy) => {
-        // Defer to top of next update tick — same frame, no macrotask hop.
         pendingSceneChangeRef.current = { sceneId, sx, sy };
+      },
+      setActorAnimation: (entityId, stateName) => {
+        const npc = npcsRef.current.find((n) => n.id === entityId);
+        const sheetId = npc?.properties?.spriteSheetId;
+        if (!sheetId) return;
+        const sheet = spriteSheetsRef.current.get(sheetId);
+        if (!sheet) return;
+        const stateDef = sheet.stateMap.get(stateName);
+        if (stateDef) {
+          // Force the actor into this state (non-looping = one-shot).
+          actorAnimsRef.current.set(entityId, {
+            stateName,
+            frame: 0,
+            accumMs: 0,
+          });
+        }
       },
     };
     runActionSteps(action.steps, ctx);

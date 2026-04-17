@@ -201,6 +201,50 @@ describe('endAdventure', () => {
   });
 });
 
+describe('playActorAnimation', () => {
+  it('calls setActorAnimation with entityId and stateName', () => {
+    const state = freshState();
+    const calls: [string, string][] = [];
+    const ctx: StepHandlerContext = {
+      state,
+      requestSceneChange: () => {},
+      setActorAnimation: (id, name) => calls.push([id, name]),
+    };
+    STEP_HANDLERS.playActorAnimation({
+      type: 'playActorAnimation',
+      params: { entityId: 'npc-1', stateName: 'emote' },
+    }, ctx);
+    expect(calls).toEqual([['npc-1', 'emote']]);
+  });
+
+  it('is a no-op when setActorAnimation is not provided', () => {
+    const { ctx } = makeCtx();
+    const result = STEP_HANDLERS.playActorAnimation({
+      type: 'playActorAnimation',
+      params: { entityId: 'npc-1', stateName: 'interact' },
+    }, ctx);
+    expect(result).toBe('continue');
+  });
+
+  it('is a no-op when entityId or stateName is missing', () => {
+    const calls: [string, string][] = [];
+    const ctx: StepHandlerContext = {
+      state: freshState(),
+      requestSceneChange: () => {},
+      setActorAnimation: (id, name) => calls.push([id, name]),
+    };
+    STEP_HANDLERS.playActorAnimation({
+      type: 'playActorAnimation',
+      params: { entityId: '', stateName: 'emote' },
+    }, ctx);
+    STEP_HANDLERS.playActorAnimation({
+      type: 'playActorAnimation',
+      params: { entityId: 'npc-1' },
+    }, ctx);
+    expect(calls).toHaveLength(0);
+  });
+});
+
 describe('canTriggerAction', () => {
   function makeAction(overrides: Partial<ActionDef> = {}): ActionDef {
     return { trigger: 'interact', steps: [], ...overrides };

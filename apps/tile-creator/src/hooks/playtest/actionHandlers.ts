@@ -18,11 +18,13 @@ export function canTriggerAction(action: ActionDef, state: PlaytestState): boole
 
 /**
  * Context passed to every step handler. Handlers read and mutate `state`,
- * and can request side effects (like a scene change) via `requestSceneChange`.
+ * and can request side effects via the context methods.
  */
 export interface StepHandlerContext {
   state: PlaytestState;
   requestSceneChange: (sceneId: string, spawnX?: number, spawnY?: number) => void;
+  /** Set a named animation state on an actor entity. Used by playActorAnimation. */
+  setActorAnimation?: (entityId: string, stateName: string) => void;
 }
 
 /**
@@ -119,8 +121,15 @@ const playerInput: StepHandler = (step, { state }) => {
 /** Group animations play automatically via the tilemap — no runtime action needed. */
 const playGroupAnimation: StepHandler = () => 'continue';
 
-/** Stub: animating a specific actor sprite is not implemented yet. */
-const playActorAnimation: StepHandler = () => 'continue';
+/** Trigger a named animation state on a specific actor (e.g. 'interact', 'emote'). */
+const playActorAnimation: StepHandler = (step, { setActorAnimation }) => {
+  const entityId = step.params.entityId as string;
+  const stateName = step.params.stateName as string;
+  if (entityId && stateName && setActorAnimation) {
+    setActorAnimation(entityId, stateName);
+  }
+  return 'continue';
+};
 
 /** Ends the adventure — shows the resolution card. Halts further steps. */
 const endAdventure: StepHandler = (step, { state }) => {

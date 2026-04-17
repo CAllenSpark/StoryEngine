@@ -33,9 +33,9 @@ const IMPLEMENTED_ACTIONS: ActionType[] = [
   'showDialogue', 'playGroupAnimation', 'changeScene',
   'playVideo', 'playAudio', 'stopAudio', 'showImage',
   'showSlideshow', 'playerInput', 'changePlayerState',
-  'endAdventure',
+  'endAdventure', 'playActorAnimation',
 ];
-const STUB_ACTIONS: ActionType[] = ['playActorAnimation'];
+const STUB_ACTIONS: ActionType[] = [];
 
 export function ActionEditor({ entityId, onClose }: ActionEditorProps) {
   const scene = useEditorStore((s) => s.scene);
@@ -201,13 +201,6 @@ export function ActionEditor({ entityId, onClose }: ActionEditorProps) {
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {IMPLEMENTED_ACTIONS.map((type) => (
               <button key={type} onClick={() => addStep(type)} style={{ fontSize: 10, padding: '2px 6px' }}>
-                {ACTION_TYPE_LABELS[type]}
-              </button>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {STUB_ACTIONS.map((type) => (
-              <button key={type} onClick={() => addStep(type)} style={{ fontSize: 10, padding: '2px 6px', opacity: 0.5 }} title="Coming soon">
                 {ACTION_TYPE_LABELS[type]}
               </button>
             ))}
@@ -463,6 +456,27 @@ function renderStepEditor(
             onClick={() => updateStep(index, { ...p, options: [...options, ''] })}
             style={{ fontSize: 10, alignSelf: 'flex-start' }}
           >+ Add Option</button>
+        </div>
+      );
+    }
+    case 'playActorAnimation': {
+      return (
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            placeholder="entity ID"
+            value={(p.entityId as string) ?? ''}
+            onChange={(e) => updateStep(index, { ...p, entityId: e.target.value })}
+            style={{ ...inputStyleSmall, width: 120 }}
+          />
+          <input
+            type="text"
+            placeholder="state (e.g. interact, emote)"
+            value={(p.stateName as string) ?? ''}
+            onChange={(e) => updateStep(index, { ...p, stateName: e.target.value })}
+            style={{ ...inputStyleSmall, width: 120 }}
+          />
+          <span style={hintStyle}>Plays a one-shot animation on the named entity.</span>
         </div>
       );
     }
