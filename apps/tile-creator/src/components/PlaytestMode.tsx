@@ -60,6 +60,16 @@ export function PlaytestMode({ onClose }: PlaytestModeProps) {
     scale: 3,
   });
 
+  // Auto-start on mount when a collection exists (one-click Playtest).
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (autoStarted.current) return;
+    if (collection && collection.scenes.length > 0) {
+      autoStarted.current = true;
+      start();
+    }
+  }, [collection, start]);
+
   // Block editor keyboard shortcuts while playtest is active
   useEffect(() => {
     const blockDown = (e: KeyboardEvent) => {

@@ -456,6 +456,7 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
 
     const onMouseMove = (e: MouseEvent) => {
       const pos = toGrid(e);
+      const prevHover = hoverRef.current;
       hoverRef.current = pos;
       if (isDraggingSelectionRef.current && pos && selectionStartRef.current) {
         useEditorStore.getState().selectArea(
@@ -471,7 +472,11 @@ export function useEditorCanvas(canvasRef: RefObject<HTMLCanvasElement | null>) 
           applyTool(pos.x, pos.y, true);
         }
       }
-      scheduleRender();
+      // Only schedule a render for hover highlight if the hovered tile changed.
+      // Store mutations (paint, select, collision) already trigger render via subscription.
+      if (pos?.x !== prevHover?.x || pos?.y !== prevHover?.y) {
+        scheduleRender();
+      }
     };
 
     const onMouseUp = () => {

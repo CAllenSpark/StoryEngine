@@ -79,14 +79,16 @@ export function App() {
 
   useEffect(() => {
     (async () => {
-      await useEditorStore.getState().restoreTileset();
-      await useEditorStore.getState().loadLibrary();
-      await useEditorStore.getState().restoreCollection();
-      await useEditorStore.getState().loadPrefabLibrary();
-      await useEditorStore.getState().loadSpriteSheetLibrary();
-      // First-run experience: if no collection was restored, auto-load the
-      // Lighthouse sample so creators see a working reference instead of
-      // a blank canvas.
+      const store = useEditorStore.getState();
+      // Load all independent resources in parallel.
+      await Promise.all([
+        store.restoreTileset(),
+        store.loadLibrary(),
+        store.restoreCollection(),
+        store.loadPrefabLibrary(),
+        store.loadSpriteSheetLibrary(),
+      ]);
+      // First-run: load the Lighthouse sample if no collection was restored.
       if (!useEditorStore.getState().currentCollection) {
         try {
           await useEditorStore.getState().loadLighthouseSample();
